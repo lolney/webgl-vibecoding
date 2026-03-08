@@ -1,0 +1,78 @@
+:root {
+  --fg: #f8f451;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 25%, #07173f 0%, #02030f 65%);
+}
+
+body {
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+#gl {
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+.hud {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  color: var(--fg);
+  text-shadow: 0 0 12px #f8f45199;
+  pointer-events: none;
+  max-width: min(720px, 90vw);
+}
+
+.hud h1 {
+  margin: 0;
+  font-size: clamp(16px, 2.2vw, 34px);
+  letter-spacing: 0.14em;
+}
+
+.hud p {
+  margin: 6px 0 10px;
+  font-size: clamp(10px, 1.1vw, 15px);
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hud button,
+#modeBadge {
+  pointer-events: auto;
+  border: 1px solid #ff88f8;
+  color: #ffefff;
+  background: linear-gradient(180deg, #8d2dff, #2f1b73);
+  padding: 9px 12px;
+  border-radius: 6px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  box-shadow: 0 0 18px #ff5cf566;
+}
+
+.hud button {
+  cursor: pointer;
+}
+
+.hud button:hover {
+  filter: brightness(1.1);
+}
+
+#modeBadge {
+  border-color: #7fbeff;
+  background: linear-gradient(180deg, #2249a5, #132866);
+}

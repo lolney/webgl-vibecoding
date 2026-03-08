@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon Clocktower Demoscene</title>
+    <link rel="stylesheet" href="./src/style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./node_modules/three/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="gl"></canvas>
+
+    <div class="hud">
+      <h1>NEON CLOCKTOWER // DEMOSCENE CUT</h1>
+      <p>Drag to orbit. Scroll to zoom. Press C for cinematic mode.</p>
+      <div class="controls-row">
+        <button id="audioToggle" type="button">Start Audio</button>
+        <span id="modeBadge">Manual Camera</span>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "demoscene-neon-clocktower",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "start": "python3 -m http.server 5173",
+    "headless": "node scripts/headless-render.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "playwright": "^1.58.2"
+  },
+  "dependencies": {
+    "three": "^0.183.2"
+  }
+}
