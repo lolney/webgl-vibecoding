@@ -3,8 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
 
-const root = path.resolve(process.cwd());
-const outputPath = path.join(root, "output", "headless-shot.png");
+const projectRoot = path.resolve(process.cwd());
+const root = path.join(projectRoot, "dist");
+if (!fs.existsSync(root)) {
+  throw new Error("Build output missing at ./dist. Run `npm run build` first.");
+}
+const outputPath = path.join(projectRoot, "output", "headless-shot.png");
 
 const mime = {
   ".html": "text/html; charset=utf-8",

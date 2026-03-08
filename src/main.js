@@ -1,9 +1,11 @@
 import * as THREE from "three";
-import { OrbitControls } from "../node_modules/three/examples/jsm/controls/OrbitControls.js";
-import { EffectComposer } from "../node_modules/three/examples/jsm/postprocessing/EffectComposer.js";
-import { RenderPass } from "../node_modules/three/examples/jsm/postprocessing/RenderPass.js";
-import { ShaderPass } from "../node_modules/three/examples/jsm/postprocessing/ShaderPass.js";
-import { UnrealBloomPass } from "../node_modules/three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { Water } from "three/examples/jsm/objects/Water.js";
 
 const canvas = document.getElementById("gl");
 const audioButton = document.getElementById("audioToggle");
@@ -18,11 +20,18 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.18;
+renderer.toneMappingExposure = 0.82;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+const envRT = pmremGenerator.fromScene(new RoomEnvironment(), 0.035);
+pmremGenerator.dispose();
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x02030f);
 scene.fog = new THREE.FogExp2(0x02030f, 0.065);
+scene.environment = envRT.texture;
 
 const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 140);
 camera.position.set(6.8, 2.8, 8.0);
@@ -42,9 +51,9 @@ composer.addPass(renderPass);
 
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.15,
+  0.78,
   0.45,
-  0.7,
+  0.82,
 );
 composer.addPass(bloomPass);
 
@@ -99,15 +108,33 @@ scene.add(ambient);
 
 const key = new THREE.DirectionalLight(0x8ce9ff, 1.2);
 key.position.set(4.2, 6.2, 5.8);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+key.shadow.camera.near = 1;
+key.shadow.camera.far = 36;
+key.shadow.camera.left = -10;
+key.shadow.camera.right = 10;
+key.shadow.camera.top = 10;
+key.shadow.camera.bottom = -10;
+key.shadow.bias = -0.0001;
 scene.add(key);
+
+const moon = new THREE.DirectionalLight(0xb2d7ff, 0.85);
+moon.position.set(-8, 4.5, -18);
+scene.add(moon);
 
 const rim = new THREE.PointLight(0xff4ef7, 8.5, 35, 2.0);
 rim.position.set(-6, 3.2, -5);
 scene.add(rim);
 
-const beamLight = new THREE.SpotLight(0x59ddff, 7.0, 42, 0.22, 0.55, 1.0);
+const beamLight = new THREE.SpotLight(0x59ddff, 9500, 65, 0.23, 0.52, 2.0);
 beamLight.position.set(0, 9.2, 0);
 beamLight.target.position.set(0, 0, 0);
+beamLight.castShadow = true;
+beamLight.shadow.mapSize.set(1024, 1024);
+beamLight.shadow.camera.near = 0.8;
+beamLight.shadow.camera.far = 42;
+beamLight.shadow.focus = 0.9;
 scene.add(beamLight);
 scene.add(beamLight.target);
 
@@ -116,6 +143,52 @@ const sky = new THREE.Mesh(
   new THREE.MeshBasicMaterial({ color: 0x04082f, side: THREE.BackSide }),
 );
 scene.add(sky);
+
+const moonVisual = new THREE.Group();
+scene.add(moonVisual);
+
+const moonDisk = new THREE.Mesh(
+  new THREE.SphereGeometry(1.95, 28, 20),
+  new THREE.MeshBasicMaterial({ color: 0xd8ecff, depthTest: false }),
+);
+moonDisk.renderOrder = 90;
+moonVisual.add(moonDisk);
+
+const moonHalo = new THREE.Mesh(
+  new THREE.PlaneGeometry(8.5, 8.5, 1, 1),
+  new THREE.ShaderMaterial({
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uPulse: { value: 0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uPulse;
+      varying vec2 vUv;
+      void main() {
+        vec2 p = vUv - 0.5;
+        float d = length(p);
+        float core = smoothstep(0.26, 0.0, d);
+        float glow = smoothstep(0.52, 0.0, d) * 0.75;
+        float ring = smoothstep(0.35, 0.32, d) * 0.25;
+        vec3 col = vec3(0.72, 0.88, 1.0) * (glow + core + ring);
+        float a = (glow * 0.55 + core * 0.65 + ring * 0.4) * (0.85 + uPulse * 0.25);
+        gl_FragColor = vec4(col, a);
+      }
+    `,
+  }),
+);
+moonHalo.renderOrder = 91;
+moonVisual.add(moonHalo);
 
 const stars = new THREE.Points(
   new THREE.BufferGeometry(),
@@ -134,8 +207,67 @@ for (let i = 0; i < starCount; i += 1) {
 stars.geometry.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
 scene.add(stars);
 
+function makeWaterNormalsTexture(size = 256) {
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const i = (y * size + x) * 4;
+      const sx = Math.sin((x / size) * Math.PI * 8.0) * 0.5 + 0.5;
+      const sy = Math.cos((y / size) * Math.PI * 11.0) * 0.5 + 0.5;
+      const n = (Math.random() * 0.25 + sx * 0.4 + sy * 0.35) * 255;
+      data[i] = Math.min(255, n + 20);
+      data[i + 1] = Math.min(255, n + 35);
+      data[i + 2] = 255;
+      data[i + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const waterNormals = makeWaterNormalsTexture(256);
+const shorelineZ = -1.35;
+const oceanGeometry = new THREE.PlaneGeometry(72, 66, 140, 140);
+const oceanBasePos = oceanGeometry.attributes.position.array.slice();
+const ocean = new Water(oceanGeometry, {
+  textureWidth: 1024,
+  textureHeight: 1024,
+  waterNormals,
+  sunDirection: new THREE.Vector3(0.38, 1.0, 0.42).normalize(),
+  sunColor: 0xffffff,
+  waterColor: 0x1f5f96,
+  distortionScale: 3.4,
+  fog: true,
+  alpha: 0.95,
+});
+ocean.rotation.x = -Math.PI / 2;
+ocean.position.set(0, -0.43, shorelineZ - 33.0);
+ocean.material.uniforms.size.value = 2.2;
+scene.add(ocean);
+
+const farOceanGeometry = new THREE.PlaneGeometry(90, 56, 90, 72);
+const farOceanBasePos = farOceanGeometry.attributes.position.array.slice();
+const farOcean = new Water(farOceanGeometry, {
+  textureWidth: 512,
+  textureHeight: 512,
+  waterNormals,
+  sunDirection: new THREE.Vector3(0.4, 1.0, 0.35).normalize(),
+  sunColor: 0xffffff,
+  waterColor: 0x347fbb,
+  distortionScale: 4.6,
+  fog: true,
+  alpha: 0.9,
+});
+farOcean.rotation.x = -Math.PI / 2 + 0.2;
+farOcean.position.set(0, -0.22, -74);
+farOcean.material.uniforms.size.value = 2.8;
+scene.add(farOcean);
+
 const ground = new THREE.Mesh(
-  new THREE.CircleGeometry(30, 100),
+  new THREE.PlaneGeometry(72, 26, 1, 1),
   new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
@@ -157,7 +289,7 @@ const ground = new THREE.Mesh(
       varying vec3 vPos;
 
       void main() {
-        float r = length(vPos.xz);
+        float r = length(vPos.xz * vec2(1.0, 0.6));
         float rings = smoothstep(0.96, 1.0, sin(r * 5.2 - uTime * 4.5) * 0.5 + 0.5);
         float gridX = smoothstep(0.94, 1.0, sin(vPos.x * 4.2 + uTime * 1.2) * 0.5 + 0.5);
         float gridZ = smoothstep(0.94, 1.0, sin(vPos.z * 4.2 + uTime * 1.2) * 0.5 + 0.5);
@@ -167,7 +299,7 @@ const ground = new THREE.Mesh(
         vec3 pulse = mix(vec3(0.08, 0.2, 0.45), vec3(0.85, 0.3, 1.0), uBeat);
         vec3 col = base + rings * vec3(0.1, 0.35, 0.75) + grid * pulse * 0.55;
 
-        float fade = smoothstep(31.0, 3.5, r);
+        float fade = smoothstep(36.0, 4.0, r);
         col *= fade;
         gl_FragColor = vec4(col, 1.0);
       }
@@ -175,16 +307,110 @@ const ground = new THREE.Mesh(
   }),
 );
 ground.rotation.x = -Math.PI / 2;
-ground.position.y = -0.36;
+ground.position.set(0, -0.36, 11.65);
+ground.receiveShadow = true;
 scene.add(ground);
 
-function neonMat(color, emissive = 0.95, roughness = 0.3) {
-  return new THREE.MeshStandardMaterial({
+const shoreline = new THREE.Mesh(
+  new THREE.PlaneGeometry(72, 1.5, 1, 1),
+  new THREE.ShaderMaterial({
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime: { value: 0 },
+      uBeat: { value: 0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uBeat;
+      varying vec2 vUv;
+      void main() {
+        float line = 1.0 - smoothstep(0.0, 0.45, abs(vUv.y - 0.5));
+        float wave = 0.5 + 0.5 * sin(vUv.x * 130.0 + uTime * 6.0);
+        float shimmer = line * (0.35 + wave * 0.65);
+        vec3 col = mix(vec3(0.1, 0.45, 0.9), vec3(0.7, 0.95, 1.0), shimmer);
+        float alpha = shimmer * (0.28 + uBeat * 0.35);
+        gl_FragColor = vec4(col, alpha);
+      }
+    `,
+  }),
+);
+shoreline.rotation.x = -Math.PI / 2;
+shoreline.position.set(0, -0.35, shorelineZ - 0.08);
+scene.add(shoreline);
+
+const moonReflection = new THREE.Mesh(
+  new THREE.PlaneGeometry(24, 56, 1, 1),
+  new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime: { value: 0 },
+      uBeat: { value: 0 },
+      uStrength: { value: 0.9 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uBeat;
+      uniform float uStrength;
+      varying vec2 vUv;
+      void main() {
+        vec2 p = vUv - 0.5;
+        float longitudinal = 1.0 - smoothstep(0.0, 0.55, abs(p.x));
+        float falloff = smoothstep(0.56, 0.0, abs(p.y));
+        float rip = 0.65 + 0.35 * sin(vUv.y * 90.0 + uTime * 6.5 + sin(vUv.y * 24.0));
+        float band = longitudinal * falloff * rip;
+        vec3 col = mix(vec3(0.2, 0.45, 0.8), vec3(0.85, 0.96, 1.0), band);
+        float alpha = band * (0.5 + uBeat * 0.25) * uStrength;
+        gl_FragColor = vec4(col, alpha);
+      }
+    `,
+  }),
+);
+moonReflection.rotation.x = -Math.PI / 2;
+moonReflection.position.set(0, -0.38, shorelineZ - 17.0);
+moonReflection.renderOrder = 70;
+scene.add(moonReflection);
+
+const moonReflectionWide = new THREE.Mesh(
+  moonReflection.geometry.clone(),
+  moonReflection.material.clone(),
+);
+moonReflectionWide.rotation.x = -Math.PI / 2;
+moonReflectionWide.scale.set(1.9, 1.35, 1.0);
+moonReflectionWide.position.set(0, -0.381, shorelineZ - 23.0);
+moonReflectionWide.renderOrder = 69;
+scene.add(moonReflectionWide);
+
+function neonMat(color, emissive = 0.95, roughness = 0.3, extra = {}) {
+  return new THREE.MeshPhysicalMaterial({
     color,
     emissive: new THREE.Color(color),
     emissiveIntensity: emissive,
     roughness,
-    metalness: 0.24,
+    metalness: 0.28,
+    clearcoat: 0.85,
+    clearcoatRoughness: 0.25,
+    reflectivity: 0.85,
+    ior: 1.45,
+    ...extra,
   });
 }
 
@@ -203,7 +429,12 @@ for (let i = -2; i <= 2; i += 1) {
   const x = i * 1.32;
   const glass = new THREE.Mesh(
     new THREE.CylinderGeometry(0.56, 0.56, 0.16, 26, 1, false, 0, Math.PI),
-    neonMat(0xffd94e, 1.6, 0.42),
+    neonMat(0xffd94e, 1.35, 0.14, {
+      transmission: 0.36,
+      thickness: 0.65,
+      attenuationDistance: 2.4,
+      attenuationColor: new THREE.Color(0xffcc66),
+    }),
   );
   glass.rotation.x = Math.PI / 2;
   glass.position.set(x, 0.34, 1.24);
@@ -290,12 +521,14 @@ scene.add(skylineGroup);
 
 const cityCount = 260;
 const cityGeo = new THREE.BoxGeometry(1, 1, 1);
-const cityMat = new THREE.MeshStandardMaterial({
+const cityMat = new THREE.MeshPhysicalMaterial({
   color: 0x4d5faa,
   emissive: new THREE.Color(0x152459),
   emissiveIntensity: 0.65,
-  roughness: 0.45,
-  metalness: 0.25,
+  roughness: 0.35,
+  metalness: 0.5,
+  clearcoat: 0.6,
+  clearcoatRoughness: 0.2,
   vertexColors: true,
 });
 const city = new THREE.InstancedMesh(cityGeo, cityMat, cityCount);
@@ -304,12 +537,12 @@ const cityColor = new THREE.Color();
 const cityData = [];
 for (let i = 0; i < cityCount; i += 1) {
   let angle = Math.random() * Math.PI * 2;
-  let dist = 11 + Math.random() * 18;
+  let dist = 16 + Math.random() * 18;
   let x = Math.cos(angle) * dist;
   let z = Math.sin(angle) * dist;
   while (Math.abs(x) < 5.2 && z > -2 && z < 13.5) {
     angle = Math.random() * Math.PI * 2;
-    dist = 11 + Math.random() * 18;
+    dist = 16 + Math.random() * 18;
     x = Math.cos(angle) * dist;
     z = Math.sin(angle) * dist;
   }
@@ -331,6 +564,8 @@ for (let i = 0; i < cityCount; i += 1) {
 }
 city.instanceColor.needsUpdate = true;
 skylineGroup.add(city);
+city.castShadow = true;
+city.receiveShadow = true;
 
 const ringGroup = new THREE.Group();
 scene.add(ringGroup);
@@ -349,10 +584,61 @@ for (let i = 0; i < 3; i += 1) {
   ringGroup.add(ring);
 }
 
+const strobeRig = new THREE.Group();
+scene.add(strobeRig);
+
+const strobeSpots = [];
+const strobeTargets = [];
+const strobeCones = [];
+const strobeColors = [0x7bdcff, 0xff6cff, 0x8ed4ff, 0xff66d6];
+
+for (let i = 0; i < 4; i += 1) {
+  const theta = (i / 4) * Math.PI * 2;
+  const target = new THREE.Object3D();
+  target.position.set(0, 1.8, 0);
+  scene.add(target);
+  strobeTargets.push(target);
+
+  const spot = new THREE.SpotLight(strobeColors[i], 6200, 58, 0.2, 0.34, 2.0);
+  spot.position.set(Math.cos(theta) * 7.8, 3.9 + (i % 2) * 0.8, Math.sin(theta) * 7.8);
+  spot.target = target;
+  spot.castShadow = i < 2;
+  if (spot.castShadow) {
+    spot.shadow.mapSize.set(1024, 1024);
+    spot.shadow.camera.near = 0.7;
+    spot.shadow.camera.far = 34;
+    spot.shadow.focus = 0.85;
+  }
+  scene.add(spot);
+  strobeSpots.push(spot);
+
+  const cone = new THREE.Mesh(
+    new THREE.ConeGeometry(spot.distance * Math.tan(spot.angle), spot.distance, 48, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: strobeColors[i],
+      transparent: true,
+      opacity: 0.05,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    }),
+  );
+  cone.position.copy(spot.position);
+  scene.add(cone);
+  strobeCones.push(cone);
+}
+
 const bloomPieces = towerGroup.children
   .filter((m) => m.material)
   .map((m) => m.material)
   .concat([cityMat]);
+
+towerGroup.traverse((obj) => {
+  if (obj.isMesh) {
+    obj.castShadow = true;
+    obj.receiveShadow = true;
+  }
+});
 
 function createSynth() {
   let audioCtx = null;
@@ -610,6 +896,31 @@ window.__canvas = canvas;
 
 const clock = new THREE.Clock();
 const tmpColor = new THREE.Color();
+const tmpDir = new THREE.Vector3();
+const upAxis = new THREE.Vector3(0, 1, 0);
+const moonDir = new THREE.Vector3();
+const moonBase = new THREE.Vector3(-32.0, 11.0, -26.0);
+
+function displaceWaterGeometry(geometry, basePositions, time, amp = 1.0) {
+  const pos = geometry.attributes.position;
+  const arr = pos.array;
+  for (let i = 0; i < arr.length; i += 3) {
+    const x = basePositions[i];
+    const y = basePositions[i + 1];
+    const z = basePositions[i + 2];
+
+    const waveA = Math.sin(x * 0.22 + z * 0.06 + time * 1.15) * 0.34;
+    const waveB = Math.cos(x * -0.09 + z * 0.19 - time * 0.82) * 0.25;
+    const waveC = Math.sin((x + z) * 0.12 + time * 1.7) * 0.16;
+    const chop = Math.sin(x * 0.9 + time * 2.2) * Math.cos(z * 0.7 - time * 1.9) * 0.055;
+
+    arr[i] = x;
+    arr[i + 1] = y;
+    arr[i + 2] = z + (waveA + waveB + waveC + chop) * amp;
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
 
 function onResize() {
   const w = window.innerWidth;
@@ -657,15 +968,77 @@ function tick() {
 
   const pulse = 0.45 + level * 0.85 + beat * 1.2;
   const sectionBoost = section === 1 ? 1.22 : section === 3 ? 1.34 : 1.0;
-  beamLight.intensity = 4.8 + pulse * 3.4;
-  rim.intensity = (6.2 + Math.sin(t * 2.3) * 1.8 + pulse * 1.1) * sectionBoost;
+  beamLight.intensity = (900 + pulse * 1800) * sectionBoost;
+  rim.intensity = (850 + Math.sin(t * 2.3) * 220 + pulse * 650) * sectionBoost;
   key.intensity = 1.0 + Math.sin(t * 1.25) * 0.3 + level * 0.4 + (section === 2 ? 0.35 : 0);
+  moon.intensity = 0.7 + Math.sin(t * 0.4) * 0.15 + level * 0.25;
+  beamLight.distance = 62 + level * 6;
+
+  moonVisual.position.set(
+    moonBase.x + Math.sin(t * 0.08) * 1.3,
+    moonBase.y + Math.sin(t * 0.06) * 0.5,
+    moonBase.z + Math.cos(t * 0.07) * 1.2,
+  );
+  moon.position.copy(moonVisual.position).normalize().multiplyScalar(28);
+  moonDir.copy(moon.position).normalize();
+  moonVisual.lookAt(camera.position);
+  moonHalo.material.uniforms.uPulse.value = 0.2 + level * 0.35 + beat * 0.55;
+
+  moonReflection.position.x = THREE.MathUtils.clamp(moonVisual.position.x * 0.5, -18.0, -12.0);
+  moonReflection.position.z = shorelineZ - 20.0 + Math.max(-5, moonVisual.position.z + 36.0) * 0.12;
+  moonReflection.scale.x = 0.9 + Math.abs(moonDir.x) * 0.7;
+  moonReflection.material.uniforms.uTime.value = t;
+  moonReflection.material.uniforms.uBeat.value = Math.min(1.0, level * 0.7 + beat * 0.8);
+  moonReflection.material.uniforms.uStrength.value = 1.55 + moon.intensity * 0.42;
+
+  moonReflectionWide.position.x = moonReflection.position.x + 1.1;
+  moonReflectionWide.position.z = moonReflection.position.z - 5.2;
+  moonReflectionWide.material.uniforms.uTime.value = t * 0.85 + 4.0;
+  moonReflectionWide.material.uniforms.uBeat.value = Math.min(1.0, level * 0.55 + beat * 0.6);
+  moonReflectionWide.material.uniforms.uStrength.value = 1.0 + moon.intensity * 0.28;
 
   beaconBeam.rotation.z = Math.sin(t * 1.5) * 0.16 + beat * 0.06;
   beaconBeam.material.opacity = 0.11 + (Math.sin(t * 3.6) * 0.5 + 0.5) * 0.13 + level * 0.18;
+  displaceWaterGeometry(oceanGeometry, oceanBasePos, t * 0.9, 1.15 + level * 0.3 + beat * 0.45);
+  displaceWaterGeometry(farOceanGeometry, farOceanBasePos, t * 0.72 + 5.0, 0.95 + level * 0.2);
+
+  ocean.material.uniforms.time.value = t * 0.48;
+  ocean.material.uniforms.sunDirection.value.copy(key.position).normalize();
+  ocean.material.uniforms.distortionScale.value = 3.2 + level * 1.5 + beat * 2.1;
+  ocean.position.x = Math.sin(t * 0.05) * 2.0;
+  ocean.rotation.z = Math.sin(t * 0.04) * 0.004;
+  farOcean.material.uniforms.time.value = t * 0.36 + 12.0;
+  farOcean.material.uniforms.sunDirection.value.copy(key.position).normalize();
+  farOcean.material.uniforms.distortionScale.value = 4.4 + level * 1.2;
 
   stars.rotation.y = t * 0.01;
   sky.rotation.y = -t * 0.006;
+
+  strobeRig.rotation.y = t * 0.09;
+  for (let i = 0; i < strobeSpots.length; i += 1) {
+    const spot = strobeSpots[i];
+    const target = strobeTargets[i];
+    const cone = strobeCones[i];
+    const phase = t * (8.5 + i * 0.75) + i * 1.13;
+    const hardStrobe = Math.pow(Math.max(0, Math.sin(phase)), section === 3 ? 7.5 : 5.8);
+    const beatAmp = 1.0 + beat * 2.2;
+    const base = 60;
+    const peak = (section === 3 ? 4400 : 2800) * beatAmp;
+    spot.intensity = base + hardStrobe * peak;
+    spot.angle = 0.16 + (Math.sin(t * 0.7 + i) * 0.5 + 0.5) * 0.14;
+
+    target.position.set(
+      Math.sin(t * 0.48 + i * 1.4) * 1.8,
+      1.3 + Math.sin(t * 0.7 + i * 0.8) * 0.55,
+      Math.cos(t * 0.52 + i * 1.1) * 1.5,
+    );
+
+    cone.position.copy(spot.position);
+    tmpDir.copy(target.position).sub(spot.position).normalize();
+    cone.quaternion.setFromUnitVectors(upAxis, tmpDir);
+    cone.material.opacity = 0.008 + hardStrobe * (0.045 + level * 0.06);
+    cone.scale.set(1, 1 + level * 0.12, 1);
+  }
 
   ringGroup.children.forEach((ring, i) => {
     ring.rotation.z = t * (0.2 + i * 0.08) * (i % 2 === 0 ? 1 : -1);
@@ -685,17 +1058,19 @@ function tick() {
   for (let i = 0; i < bloomPieces.length; i += 1) {
     const mat = bloomPieces[i];
     if (mat && "emissiveIntensity" in mat) {
-      mat.emissiveIntensity = 0.75 + (Math.sin(t * 2.5 + i * 0.7) * 0.5 + 0.5) * 1.25 + level * 0.9;
+      mat.emissiveIntensity = 0.15 + (Math.sin(t * 2.5 + i * 0.7) * 0.5 + 0.5) * 0.55 + level * 0.35;
     }
   }
 
   ground.material.uniforms.uTime.value = t;
   ground.material.uniforms.uBeat.value = Math.min(1.0, level * 0.8 + beat * 1.2);
+  shoreline.material.uniforms.uTime.value = t;
+  shoreline.material.uniforms.uBeat.value = Math.min(1.0, level * 0.8 + beat * 1.2);
 
   bloomPass.strength =
-    (section === 3 ? 1.45 : 1.0) + level * (section === 1 ? 1.35 : 0.9) + beat * 0.95;
+    (section === 3 ? 1.05 : 0.72) + level * (section === 1 ? 0.62 : 0.45) + beat * 0.45;
   bloomPass.radius = 0.4 + level * (section === 2 ? 0.26 : 0.18);
-  bloomPass.threshold = (section === 3 ? 0.62 : 0.69) - level * 0.08;
+  bloomPass.threshold = (section === 3 ? 0.78 : 0.82) - level * 0.05;
 
   crtPass.uniforms.uTime.value = t;
   crtPass.uniforms.uBeat.value = Math.min(1.0, beat * 1.2 + level * 0.6);
@@ -715,6 +1090,7 @@ function tick() {
     level: Number(level.toFixed(3)),
     beat: Number(beat.toFixed(3)),
     section,
+    oceanTime: Number(ocean.material.uniforms.time.value.toFixed(2)),
     cinematicMix: Number(cinematicMix.toFixed(3)),
   };
 
