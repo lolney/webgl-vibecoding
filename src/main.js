@@ -425,6 +425,28 @@ const towerStripe = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.2, 2.65), neonMa
 towerStripe.position.set(0, 1.35, 0);
 towerGroup.add(towerStripe);
 
+const towerDetailMat = neonMat(0x7cc7ff, 0.9, 0.24, { metalness: 0.42, clearcoatRoughness: 0.14 });
+const towerAccentMat = neonMat(0xff7cf8, 1.5, 0.16, { metalness: 0.38 });
+
+for (let i = -2; i <= 2; i += 1) {
+  const x = i * 1.42;
+  const braceFront = new THREE.Mesh(new THREE.BoxGeometry(0.13, 1.6, 0.16), towerDetailMat);
+  braceFront.position.set(x, 0.52, 1.18);
+  towerGroup.add(braceFront);
+
+  const braceBack = braceFront.clone();
+  braceBack.position.z = -1.18;
+  towerGroup.add(braceBack);
+}
+
+for (let i = 0; i < 4; i += 1) {
+  const sx = i < 2 ? -2.95 : 2.95;
+  const sz = i % 2 === 0 ? -1.08 : 1.08;
+  const pylon = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 1.7, 10), towerDetailMat);
+  pylon.position.set(sx, 0.5, sz);
+  towerGroup.add(pylon);
+}
+
 for (let i = -2; i <= 2; i += 1) {
   const x = i * 1.32;
   const glass = new THREE.Mesh(
@@ -456,6 +478,14 @@ for (let i = -2; i <= 2; i += 1) {
 const shaft = new THREE.Mesh(new THREE.BoxGeometry(1.42, 6.0, 1.42), neonMat(0x2cc4ff, 1.0, 0.28));
 shaft.position.y = 3.66;
 towerGroup.add(shaft);
+
+const shaftRibGeo = new THREE.BoxGeometry(0.1, 5.8, 0.1);
+for (let i = 0; i < 4; i += 1) {
+  const rib = new THREE.Mesh(shaftRibGeo, towerDetailMat);
+  const angle = (i / 4) * Math.PI * 2 + Math.PI * 0.25;
+  rib.position.set(Math.cos(angle) * 0.6, 3.66, Math.sin(angle) * 0.6);
+  towerGroup.add(rib);
+}
 
 for (let i = 0; i < 6; i += 1) {
   const y = 1.55 + i * 0.8;
@@ -491,6 +521,21 @@ const clockRingInner = new THREE.Mesh(
 clockRingInner.position.set(0, 4.35, 0.742);
 towerGroup.add(clockRingInner);
 
+const clockTickGroup = new THREE.Group();
+towerGroup.add(clockTickGroup);
+
+for (let i = 0; i < 12; i += 1) {
+  const isMajor = i % 3 === 0;
+  const tick = new THREE.Mesh(
+    new THREE.BoxGeometry(isMajor ? 0.034 : 0.024, isMajor ? 0.12 : 0.08, 0.026),
+    isMajor ? towerAccentMat : towerDetailMat,
+  );
+  const a = (i / 12) * Math.PI * 2;
+  tick.position.set(Math.sin(a) * 0.365, 4.35 + Math.cos(a) * 0.365, 0.754);
+  tick.rotation.z = -a;
+  clockTickGroup.add(tick);
+}
+
 const minuteHand = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.31, 0.04), neonMat(0xffef74, 2.25, 0.12));
 minuteHand.geometry.translate(0, 0.155, 0);
 minuteHand.position.set(0, 4.35, 0.752);
@@ -500,6 +545,29 @@ const hourHand = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.205, 0.045), neon
 hourHand.geometry.translate(0, 0.102, 0);
 hourHand.position.set(0, 4.35, 0.758);
 towerGroup.add(hourHand);
+
+const towerCables = [];
+for (let i = 0; i < 3; i += 1) {
+  const points = [];
+  const segments = 56;
+  const radius = 1.0 + i * 0.13;
+  for (let s = 0; s <= segments; s += 1) {
+    const a = (s / segments) * Math.PI * 2;
+    const y = 2.25 + (s / segments) * 3.2 + Math.sin(a * 3 + i * 1.4) * 0.08;
+    points.push(new THREE.Vector3(Math.cos(a) * radius, y, Math.sin(a) * radius));
+  }
+  const cable = new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 220, 0.024, 8, false),
+    neonMat(i % 2 === 0 ? 0xff74f8 : 0x6fd9ff, 1.2 + i * 0.2, 0.14, {
+      transparent: true,
+      opacity: 0.92,
+      clearcoat: 0.95,
+      clearcoatRoughness: 0.1,
+    }),
+  );
+  towerCables.push(cable);
+  towerGroup.add(cable);
+}
 
 const beaconBeam = new THREE.Mesh(
   new THREE.ConeGeometry(1.1, 12.5, 40, 1, true),
@@ -535,6 +603,28 @@ const city = new THREE.InstancedMesh(cityGeo, cityMat, cityCount);
 const cityDummy = new THREE.Object3D();
 const cityColor = new THREE.Color();
 const cityData = [];
+const cityCapMat = new THREE.MeshPhysicalMaterial({
+  color: 0x77a9ff,
+  emissive: new THREE.Color(0x2640a0),
+  emissiveIntensity: 1.1,
+  roughness: 0.24,
+  metalness: 0.46,
+  clearcoat: 0.8,
+  clearcoatRoughness: 0.18,
+  vertexColors: true,
+});
+const cityCaps = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cityCapMat, cityCount);
+const antennaMat = new THREE.MeshPhysicalMaterial({
+  color: 0x9ed8ff,
+  emissive: new THREE.Color(0xff79f8),
+  emissiveIntensity: 1.4,
+  roughness: 0.22,
+  metalness: 0.66,
+  clearcoat: 0.86,
+  clearcoatRoughness: 0.12,
+  vertexColors: true,
+});
+const cityAntennas = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 8), antennaMat, cityCount);
 for (let i = 0; i < cityCount; i += 1) {
   let angle = Math.random() * Math.PI * 2;
   let dist = 16 + Math.random() * 18;
@@ -557,15 +647,59 @@ for (let i = 0; i < cityCount; i += 1) {
   cityDummy.updateMatrix();
   city.setMatrixAt(i, cityDummy.matrix);
 
+  const capHeight = Math.max(0.09, 0.07 + h * 0.05);
+  cityDummy.position.set(x, h - 0.32 + capHeight * 0.5, z);
+  cityDummy.scale.set(Math.max(0.18, w * 0.78), capHeight, Math.max(0.18, d * 0.78));
+  cityDummy.lookAt(0, cityDummy.position.y, 0);
+  cityDummy.updateMatrix();
+  cityCaps.setMatrixAt(i, cityDummy.matrix);
+
+  const antennaHeight = 0.3 + Math.random() * 1.1;
+  const hasAntenna = Math.random() > 0.42;
+  const offsetX = (Math.random() - 0.5) * w * 0.26;
+  const offsetZ = (Math.random() - 0.5) * d * 0.26;
+  cityDummy.position.set(
+    x + offsetX,
+    h - 0.32 + capHeight + (hasAntenna ? antennaHeight * 0.5 : 0.005),
+    z + offsetZ,
+  );
+  cityDummy.scale.set(
+    Math.max(0.012, w * 0.028),
+    hasAntenna ? antennaHeight : 0.01,
+    Math.max(0.012, d * 0.028),
+  );
+  cityDummy.lookAt(0, cityDummy.position.y, 0);
+  cityDummy.updateMatrix();
+  cityAntennas.setMatrixAt(i, cityDummy.matrix);
+
   cityColor.setHSL(0.58 + Math.random() * 0.08, 0.65, 0.38 + Math.random() * 0.2);
   city.setColorAt(i, cityColor);
 
-  cityData.push({ phase: Math.random() * Math.PI * 2, amp: 0.4 + Math.random() * 0.8 });
+  cityColor.setHSL(0.58 + Math.random() * 0.08, 0.8, 0.58 + Math.random() * 0.22);
+  cityCaps.setColorAt(i, cityColor);
+
+  cityColor.setHSL(0.84 + Math.random() * 0.1, 0.78, hasAntenna ? 0.74 : 0.0);
+  cityAntennas.setColorAt(i, cityColor);
+
+  cityData.push({
+    phase: Math.random() * Math.PI * 2,
+    amp: 0.4 + Math.random() * 0.8,
+    hasAntenna,
+    glowOffset: Math.random() * Math.PI * 2,
+  });
 }
 city.instanceColor.needsUpdate = true;
+cityCaps.instanceColor.needsUpdate = true;
+cityAntennas.instanceColor.needsUpdate = true;
 skylineGroup.add(city);
+skylineGroup.add(cityCaps);
+skylineGroup.add(cityAntennas);
 city.castShadow = true;
 city.receiveShadow = true;
+cityCaps.castShadow = true;
+cityCaps.receiveShadow = true;
+cityAntennas.castShadow = true;
+cityAntennas.receiveShadow = true;
 
 const ringGroup = new THREE.Group();
 scene.add(ringGroup);
@@ -631,7 +765,7 @@ for (let i = 0; i < 4; i += 1) {
 const bloomPieces = towerGroup.children
   .filter((m) => m.material)
   .map((m) => m.material)
-  .concat([cityMat]);
+  .concat([cityMat, cityCapMat, antennaMat]);
 
 towerGroup.traverse((obj) => {
   if (obj.isMesh) {
@@ -890,6 +1024,10 @@ window.addEventListener("keydown", (e) => {
     markInteraction();
   }
 });
+modeBadge.addEventListener("click", () => {
+  setCinematic(!cinematic);
+  markInteraction();
+});
 
 window.__demoState = { ok: true, frames: 0, lastTime: 0, debug: {} };
 window.__canvas = canvas;
@@ -945,8 +1083,7 @@ function tick() {
 
   controls.update();
 
-  const idle = performance.now() - lastInteraction;
-  const shouldCinematicBlend = cinematic || idle > 7000;
+  const shouldCinematicBlend = cinematic;
   cinematicMix = THREE.MathUtils.lerp(cinematicMix, shouldCinematicBlend ? 1 : 0, 0.02);
 
   const autoAngle = t * 0.19;
