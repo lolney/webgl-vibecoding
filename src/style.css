@@ -102,3 +102,34 @@ body {
   border-color: #7fbeff;
   background: linear-gradient(180deg, #2249a5, #132866);
 }
+
+.orbit-schematic {
+  position: fixed;
+  right: 18px;
+  top: 18px;
+  width: min(320px, 38vw);
+  height: min(220px, 30vh);
+  border: 1px solid #8ec7ff66;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 20px #66b8ff33;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.orbit-schematic.hidden {
+  display: none;
+}
+
+#orbitSchematicCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .orbit-schematic {
+    width: min(280px, 48vw);
+    height: min(190px, 26vh);
+  }
+}

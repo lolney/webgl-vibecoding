@@ -14,6 +14,7 @@ import { binaryExternalScene } from "./scenes/binaryExternalScene.js";
 import { binarySurfaceScene } from "./scenes/binarySurfaceScene.js";
 import { createSceneManager } from "./scenes/sceneManager.js";
 import { createHudPrimitive } from "./ui/hudPrimitive.js";
+import { createOrbitSchematic } from "./ui/orbitSchematic.js";
 import { updateBinaryScene } from "./scenes/controllers/binarySceneController.js";
 import { updateClocktowerScene } from "./scenes/controllers/clocktowerSceneController.js";
 import { applySceneModeInternal } from "./scenes/controllers/sceneModeController.js";
@@ -21,6 +22,7 @@ import { applySceneModeInternal } from "./scenes/controllers/sceneModeController
 const canvas = document.getElementById("gl");
 const audioButton = document.getElementById("audioToggle");
 const hud = createHudPrimitive();
+const orbitSchematic = createOrbitSchematic();
 const { sceneChooser, modeBadge, timeIndicator } = hud.elements;
 const query = new URLSearchParams(window.location.search);
 const debugView = query.get("debug") === "1";
@@ -1390,6 +1392,7 @@ function applySceneMode(nextSceneKey, options = {}) {
     syncSceneToUrl,
     setCinematic,
   });
+  orbitSchematic.setVisible(activeSceneKey === "binarySurface");
 }
 
 function createSynth() {
@@ -1853,6 +1856,7 @@ function tick() {
       binaryDayHours,
       debugView,
     });
+    orbitSchematic.render(activeSceneKey === "binarySurface" ? sceneDebug.schematic : null);
   } else {
     clocktowerControllerCtx.usingBlenderTower = usingBlenderTower;
     clocktowerControllerCtx.usingBlenderCity = usingBlenderCity;
@@ -1865,6 +1869,7 @@ function tick() {
       section,
       cinematicMix,
     });
+    orbitSchematic.render(null);
   }
 
   window.__demoState.frames += 1;

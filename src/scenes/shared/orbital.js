@@ -5,72 +5,155 @@ function smoothstep(edge0, edge1, x) {
   return t * t * (3 - 2 * t);
 }
 
-function dirFromAzAlt(azimuth, altitude) {
+function extractViewerTurnYaw(cameraPosition, cameraTarget) {
+  const look = new THREE.Vector3().copy(cameraTarget).sub(cameraPosition).setY(0);
+  if (look.lengthSq() < 1e-8) return 0;
+  look.normalize();
+  return Math.atan2(look.x, -look.z);
+}
+
+function buildLocalFrame(surfaceNormal) {
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  const east = new THREE.Vector3().crossVectors(worldUp, surfaceNormal);
+  if (east.lengthSq() < 1e-8) east.set(1, 0, 0);
+  east.normalize();
+  const north = new THREE.Vector3().crossVectors(surfaceNormal, east).normalize();
+  return { east, north };
+}
+
+function toViewerLocal(worldDir, frame, surfaceNormal) {
   return new THREE.Vector3(
-    Math.sin(azimuth) * Math.cos(altitude),
-    Math.sin(altitude),
-    -Math.cos(azimuth) * Math.cos(altitude),
+    worldDir.dot(frame.east),
+    worldDir.dot(surfaceNormal),
+    worldDir.dot(frame.north),
   ).normalize();
 }
 
-export function computeBinaryOrbitState({ t, binaryDayHours, planetOrbitRadius }) {
-  const sysT = t * 0.24;
+export function computeBinarySimulationState({
+  binaryDayHours,
+  planetOrbitRadius,
+  cameraPosition,
+  cameraTarget,
+}) {
+  const dayPhase = THREE.MathUtils.euclideanModulo(binaryDayHours, 24) / 24;
+  const dayAngle = dayPhase * Math.PI * 2;
+
+  // One shared simulation clock drives all orbital motion.
+  const starOrbitAngle = dayAngle * 2.15;
+  const planetOrbitAngle = dayAngle * 0.22 + 0.7;
+
   const starAPosition = new THREE.Vector3(
-    Math.cos(sysT) * 4.8,
-    Math.sin(sysT * 0.35) * 0.22,
-    Math.sin(sysT) * 4.8,
+    Math.cos(starOrbitAngle) * 4.6,
+    Math.sin(starOrbitAngle * 0.67) * 0.32,
+    Math.sin(starOrbitAngle) * 4.6,
   );
   const starBPosition = new THREE.Vector3(
-    -Math.cos(sysT * 1.03) * 5.6,
-    Math.cos(sysT * 0.42) * 0.26,
-    -Math.sin(sysT * 1.03) * 5.6,
+    -Math.cos(starOrbitAngle) * 5.4,
+    Math.cos(starOrbitAngle * 0.91) * 0.28,
+    -Math.sin(starOrbitAngle) * 5.4,
   );
-
-  const planetOrbitA = sysT * 0.38;
   const planetPosition = new THREE.Vector3(
-    Math.cos(planetOrbitA) * planetOrbitRadius,
+    Math.cos(planetOrbitAngle) * planetOrbitRadius,
     0,
-    Math.sin(planetOrbitA) * planetOrbitRadius,
+    Math.sin(planetOrbitAngle) * planetOrbitRadius,
   );
 
-  const dayPhase = binaryDayHours / 24;
-  const primaryAltitude = Math.sin((dayPhase - 0.25) * Math.PI * 2);
-  const secondSunStart = 18.48;
-  const secondSunEnd = 18.78;
-  const secondWindow = smoothstep(secondSunStart, secondSunStart + 0.02, binaryDayHours)
-    * (1 - smoothstep(secondSunEnd - 0.02, secondSunEnd, binaryDayHours));
-  const secondArc = THREE.MathUtils.clamp(
-    (binaryDayHours - secondSunStart) / Math.max(0.0001, secondSunEnd - secondSunStart),
-    0,
-    1,
-  );
-  const secondaryAltitude = Math.sin(secondArc * Math.PI) * secondWindow;
+  const spinYaw = dayAngle; // Exactly one rotation per day.
+  const viewerTurnYaw = extractViewerTurnYaw(cameraPosition, cameraTarget);
+  const viewerYaw = spinYaw + viewerTurnYaw;
 
-  const dayStrength = THREE.MathUtils.clamp(primaryAltitude * 1.15, 0, 1);
-  const secondStrength = THREE.MathUtils.clamp(secondaryAltitude * 2.6, 0, 1);
-  const daylight = smoothstep(-0.12, 0.25, primaryAltitude);
-  const twilight = smoothstep(-0.24, -0.02, primaryAltitude) * (1 - smoothstep(0.15, 0.5, primaryAltitude));
+  const surfaceNormal = new THREE.Vector3(Math.sin(viewerYaw), 0, -Math.cos(viewerYaw)).normalize();
+  const spinDir = new THREE.Vector2(Math.sin(spinYaw), -Math.cos(spinYaw));
+  const viewerDir = new THREE.Vector2(surfaceNormal.x, surfaceNormal.z);
 
-  const primaryAz = Math.sin((binaryDayHours - 12) * 0.18) * 0.4;
-  const primaryAlt = primaryAltitude * (Math.PI * 0.32) + 0.16;
-  const secondaryAz = -0.32;
-  const secondaryAlt = (-0.01 + secondaryAltitude * 0.06) * Math.PI + 0.11;
+  const toA = new THREE.Vector3().subVectors(starAPosition, planetPosition).normalize();
+  const toB = new THREE.Vector3().subVectors(starBPosition, planetPosition).normalize();
+  const distA = Math.max(0.001, starAPosition.distanceTo(planetPosition));
+  const distB = Math.max(0.001, starBPosition.distanceTo(planetPosition));
 
-  const primaryDir = dirFromAzAlt(primaryAz, primaryAlt);
-  const secondaryDir = dirFromAzAlt(secondaryAz, secondaryAlt);
+  // Weight by inverse-square falloff and star "intrinsic" brightness.
+  const weightA = 1.0 / (distA * distA);
+  const weightB = 0.68 / (distB * distB);
+  const combinedStarWorld = toA.clone().multiplyScalar(weightA).add(toB.clone().multiplyScalar(weightB)).normalize();
+  const combinedStarDir = new THREE.Vector2(combinedStarWorld.x, combinedStarWorld.z);
+
+  const incidenceA = Math.max(0, toA.dot(surfaceNormal));
+  const incidenceB = Math.max(0, toB.dot(surfaceNormal));
+  const lightA = incidenceA * weightA;
+  const lightB = incidenceB * weightB;
+  const lightTotal = lightA + lightB;
+
+  const daylight = THREE.MathUtils.clamp(lightTotal * 500, 0, 1);
+  const dayStrength = THREE.MathUtils.clamp(lightA * 620, 0, 1);
+  const secondStrength = THREE.MathUtils.clamp(lightB * 780, 0, 1);
+
+  const maxIncidence = Math.max(toA.dot(surfaceNormal), toB.dot(surfaceNormal));
+  const twilight = smoothstep(-0.16, 0.07, maxIncidence) * (1 - smoothstep(0.17, 0.42, maxIncidence));
+
+  const localFrame = buildLocalFrame(surfaceNormal);
+  const primaryDir = toViewerLocal(toA, localFrame, surfaceNormal);
+  const secondaryDir = toViewerLocal(toB, localFrame, surfaceNormal);
+  const viewerLightDot = surfaceNormal.dot(combinedStarWorld);
 
   return {
-    sysT,
+    dayPhase,
+    spinYaw,
+    viewerTurnYaw,
+    viewerYaw,
     starAPosition,
     starBPosition,
     planetPosition,
-    dayPhase,
+    spinDir,
+    viewerDir,
+    combinedStarDir,
+    viewerLightDot,
     dayStrength,
     secondStrength,
     daylight,
     twilight,
     primaryDir,
     secondaryDir,
-    secondWindow,
+    orbitRadius: planetOrbitRadius,
+  };
+}
+
+// Backward compatibility for current scene code while migrating.
+export function computeBinaryOrbitState({ binaryDayHours, planetOrbitRadius, cameraPosition, cameraTarget }) {
+  return computeBinarySimulationState({ binaryDayHours, planetOrbitRadius, cameraPosition, cameraTarget });
+}
+
+export function computeBinaryViewerState({
+  planetPosition,
+  planetRotationY,
+  cameraPosition,
+  cameraTarget,
+  orbitRadius,
+  starAPosition,
+  starBPosition,
+}) {
+  const surfaceNormal = new THREE.Vector3(Math.sin(planetRotationY), 0, -Math.cos(planetRotationY)).normalize();
+  const viewerTurnYaw = extractViewerTurnYaw(cameraPosition, cameraTarget);
+  const viewerYaw = planetRotationY + viewerTurnYaw;
+  const viewerNormal = new THREE.Vector3(Math.sin(viewerYaw), 0, -Math.cos(viewerYaw)).normalize();
+
+  const spinDir = new THREE.Vector2(surfaceNormal.x, surfaceNormal.z);
+  const viewerDir = new THREE.Vector2(viewerNormal.x, viewerNormal.z);
+
+  const lightA = new THREE.Vector2(starAPosition.x - planetPosition.x, starAPosition.z - planetPosition.z).normalize();
+  const lightB = new THREE.Vector2(starBPosition.x - planetPosition.x, starBPosition.z - planetPosition.z).normalize();
+  const combinedStarDir = lightA.clone().multiplyScalar(0.64).add(lightB.clone().multiplyScalar(0.36)).normalize();
+
+  return {
+    starA: new THREE.Vector2(starAPosition.x, starAPosition.z),
+    starB: new THREE.Vector2(starBPosition.x, starBPosition.z),
+    planet: new THREE.Vector2(planetPosition.x, planetPosition.z),
+    spinDir,
+    viewerDir,
+    combinedStarDir,
+    viewerLightDot: viewerDir.dot(combinedStarDir),
+    viewerTurnYaw,
+    spinYaw: planetRotationY,
+    viewerYaw,
+    orbitRadius,
   };
 }

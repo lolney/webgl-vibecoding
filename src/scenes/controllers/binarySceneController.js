@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { computeBinaryOrbitState } from "../shared/orbital.js";
+import { computeBinarySimulationState } from "../shared/orbital.js";
 
 export function updateBinaryScene(ctx, frame) {
   const {
@@ -44,7 +44,12 @@ export function updateBinaryScene(ctx, frame) {
     debugView,
   } = frame;
 
-  const orbit = computeBinaryOrbitState({ t, binaryDayHours, planetOrbitRadius });
+  const orbit = computeBinarySimulationState({
+    binaryDayHours,
+    planetOrbitRadius,
+    cameraPosition: camera.position,
+    cameraTarget: controls.target,
+  });
   const {
     starAPosition,
     starBPosition,
@@ -68,7 +73,7 @@ export function updateBinaryScene(ctx, frame) {
   binaryStarBLight.position.copy(starBGroup.position);
 
   planetPivot.position.copy(planetPosition);
-  planetGroup.rotation.y = t * 0.25;
+  planetGroup.rotation.y = orbit.spinYaw;
   cloudLayer.rotation.y = -t * 0.17;
 
   if (isSurfaceScene) {
@@ -117,7 +122,7 @@ export function updateBinaryScene(ctx, frame) {
     if (isExternalScene) {
       timeIndicator.textContent = "System View";
     } else {
-      const phaseText = secondStrength > 0.06 ? "2nd Sun" : daylight > 0.28 ? "Day" : "Night";
+      const phaseText = orbit.viewerLightDot > 0.0 ? "Day" : "Night";
       timeIndicator.textContent = `Time ${format24Hour(binaryDayHours)} ${phaseText}`;
     }
   }
@@ -215,5 +220,18 @@ export function updateBinaryScene(ctx, frame) {
     secondStrength,
     scene: activeSceneKey,
     time24: format24Hour(binaryDayHours),
+    schematic: {
+      starA: [orbit.starAPosition.x, orbit.starAPosition.z],
+      starB: [orbit.starBPosition.x, orbit.starBPosition.z],
+      planet: [orbit.planetPosition.x, orbit.planetPosition.z],
+      spinDir: [orbit.spinDir.x, orbit.spinDir.y],
+      viewerDir: [orbit.viewerDir.x, orbit.viewerDir.y],
+      combinedStarDir: [orbit.combinedStarDir.x, orbit.combinedStarDir.y],
+      viewerLightDot: orbit.viewerLightDot,
+      viewerTurnYaw: orbit.viewerTurnYaw,
+      spinYaw: orbit.spinYaw,
+      viewerYaw: orbit.viewerYaw,
+      orbitRadius: orbit.orbitRadius,
+    },
   };
 }
