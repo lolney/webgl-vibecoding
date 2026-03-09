@@ -138,16 +138,10 @@ export function updateBinaryScene(ctx, frame) {
     controls.target.lerp(new THREE.Vector3(0, 0, 0), cinematicMix * 0.06);
   } else {
     if (cinematicMix > 0.001) {
-      const followDir = primaryDir
-        .clone()
-        .multiplyScalar(Math.max(0.05, dayStrength))
-        .add(secondaryDir.clone().multiplyScalar(Math.max(0.0, secondStrength * 1.1)))
-        .normalize();
-      const targetDist = 120;
-      const sunTrackTarget = camera.position.clone().add(followDir.multiplyScalar(targetDist));
-      sunTrackTarget.y = camera.position.y + THREE.MathUtils.clamp(followDir.y, -0.15, 0.72) * 64;
-      controls.target.lerp(sunTrackTarget, cinematicMix * 0.12);
-      camera.lookAt(controls.target);
+      // Sun-track mode rotates aim only while preserving camera position and orbit distance.
+      const followDistance = THREE.MathUtils.clamp(camera.position.distanceTo(controls.target), 6, 18);
+      const primaryTarget = camera.position.clone().add(primaryDir.clone().multiplyScalar(followDistance));
+      controls.target.lerp(primaryTarget, cinematicMix * 0.14);
     }
     if (camera.position.y < 1.0) camera.position.y = 1.0;
     camera.up.set(0, 1, 0);

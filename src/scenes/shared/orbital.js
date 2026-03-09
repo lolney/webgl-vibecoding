@@ -72,6 +72,9 @@ export function computeBinarySimulationState({
   const lookWorld = new THREE.Vector3().copy(cameraTarget).sub(cameraPosition);
   if (lookWorld.lengthSq() < 1e-8) lookWorld.set(0, 0, -1);
   lookWorld.normalize();
+  const lookHorizontal = new THREE.Vector2(lookWorld.x, lookWorld.z);
+  if (lookHorizontal.lengthSq() < 1e-8) lookHorizontal.set(0, -1);
+  lookHorizontal.normalize();
 
   const toA = new THREE.Vector3().subVectors(starAPosition, planetPosition).normalize();
   const toB = new THREE.Vector3().subVectors(starBPosition, planetPosition).normalize();
@@ -103,14 +106,12 @@ export function computeBinarySimulationState({
   const secondaryDir = toB;
   const viewerLightDot = observerNormal.dot(combinedStarWorld);
 
-  const viewerTangent = projectToTangent(lookWorld, observerNormal);
-  const viewerDir = new THREE.Vector2(viewerTangent.x, viewerTangent.z);
-  if (viewerDir.lengthSq() > 1e-8) viewerDir.normalize();
-
-  const observerFrame = buildLocalFrame(observerNormal);
-  const turnX = viewerTangent.dot(observerFrame.east);
-  const turnY = viewerTangent.dot(observerFrame.north);
-  const resolvedTurnYaw = Math.atan2(turnX, turnY);
+  // Schematic viewer heading follows actual camera heading in world-top-down space.
+  const viewerDir = lookHorizontal.clone();
+  const worldLookYaw = Math.atan2(lookHorizontal.x, -lookHorizontal.y);
+  let resolvedTurnYaw = worldLookYaw - observerYaw;
+  while (resolvedTurnYaw > Math.PI) resolvedTurnYaw -= Math.PI * 2;
+  while (resolvedTurnYaw < -Math.PI) resolvedTurnYaw += Math.PI * 2;
   const viewerYaw = observerYaw + resolvedTurnYaw;
 
   return {

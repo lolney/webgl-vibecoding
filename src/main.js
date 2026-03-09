@@ -1895,6 +1895,8 @@ function tick() {
     blenderTower: usingBlenderTower,
     blenderCity: usingBlenderCity,
     debugView,
+    cameraPos: [Number(camera.position.x.toFixed(3)), Number(camera.position.y.toFixed(3)), Number(camera.position.z.toFixed(3))],
+    cameraTarget: [Number(controls.target.x.toFixed(3)), Number(controls.target.y.toFixed(3)), Number(controls.target.z.toFixed(3))],
     ...sceneDebug,
   };
 
