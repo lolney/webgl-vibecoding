@@ -5,6 +5,7 @@
   "scripts": {
     "start": "vite",
     "headless": "npm run build && node scripts/headless-render.mjs",
+    "headless:debug": "npm run build && node scripts/headless-render.mjs --debug",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --host"

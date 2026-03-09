@@ -64,6 +64,32 @@ body {
   box-shadow: 0 0 18px #ff5cf566;
 }
 
+.hud select {
+  pointer-events: auto;
+  border: 1px solid #7fbeff;
+  color: #e7f6ff;
+  background: linear-gradient(180deg, #1f4a99, #102554);
+  padding: 9px 12px;
+  border-radius: 6px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  box-shadow: 0 0 18px #66adff55;
+}
+
+#timeIndicator {
+  pointer-events: none;
+  border: 1px solid #b8d6ff;
+  color: #dff2ff;
+  background: linear-gradient(180deg, #1a315f, #0b1632);
+  padding: 9px 12px;
+  border-radius: 6px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  box-shadow: 0 0 14px #8dc1ff44;
+}
+
 .hud button {
   cursor: pointer;
 }

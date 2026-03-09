@@ -8,7 +8,10 @@ const root = path.join(projectRoot, "dist");
 if (!fs.existsSync(root)) {
   throw new Error("Build output missing at ./dist. Run `npm run build` first.");
 }
-const outputPath = path.join(projectRoot, "output", "headless-shot.png");
+const args = process.argv.slice(2);
+const debugMode = args.includes("--debug");
+const canvasOutputPath = path.join(projectRoot, "output", debugMode ? "headless-debug-canvas.png" : "headless-shot.png");
+const pageOutputPath = path.join(projectRoot, "output", debugMode ? "headless-debug-page.png" : "headless-page.png");
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -19,7 +22,8 @@ const mime = {
 
 const server = http.createServer((req, res) => {
   try {
-    const urlPath = req.url === "/" ? "/index.html" : req.url;
+    const parsed = new URL(req.url, "http://127.0.0.1");
+    const urlPath = parsed.pathname === "/" ? "/index.html" : parsed.pathname;
     const fsPath = path.join(root, decodeURIComponent(urlPath));
     if (!fsPath.startsWith(root)) {
       res.writeHead(403);
@@ -68,8 +72,10 @@ try {
     if (msg.type() === "error") pageErrors.push(`console.error: ${msg.text()}`);
   });
 
-  await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
+  const route = debugMode ? "/?debug=1" : "/";
+  await page.goto(`http://127.0.0.1:${port}${route}`, { waitUntil: "networkidle" });
   await page.waitForTimeout(1800);
+  await page.screenshot({ path: pageOutputPath, fullPage: true });
   const canvasPngDataUrl = await page.evaluate(() => {
     const canvas = window.__canvas || document.querySelector("canvas");
     return canvas ? canvas.toDataURL("image/png") : null;
@@ -78,7 +84,7 @@ try {
     throw new Error("Canvas export failed: no canvas");
   }
   const base64 = canvasPngDataUrl.split(",")[1];
-  fs.writeFileSync(outputPath, Buffer.from(base64, "base64"));
+  fs.writeFileSync(canvasOutputPath, Buffer.from(base64, "base64"));
 
   const diagnostics = await page.evaluate(() => {
     const state = window.__demoState || null;
@@ -98,7 +104,7 @@ try {
     throw new Error(`Renderer did not animate enough frames: ${JSON.stringify(diagnostics)}`);
   }
 
-  const shotStat = fs.statSync(outputPath);
+  const shotStat = fs.statSync(canvasOutputPath);
   if (shotStat.size < 5000) {
     throw new Error(`Screenshot too small (${shotStat.size} bytes), render likely failed`);
   }
@@ -109,7 +115,8 @@ try {
     ).toFixed(2)}s bg=${diagnostics.bodyBg}`,
   );
   console.log(`Debug: ${JSON.stringify(diagnostics.state.debug || {})}`);
-  console.log(`Screenshot: ${outputPath}`);
+  console.log(`Canvas screenshot: ${canvasOutputPath}`);
+  console.log(`Page screenshot: ${pageOutputPath}`);
 } finally {
   if (browser) await browser.close();
   await new Promise((resolve) => server.close(resolve));
