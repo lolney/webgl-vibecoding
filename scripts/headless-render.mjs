@@ -9,15 +9,44 @@ if (!fs.existsSync(root)) {
   throw new Error("Build output missing at ./dist. Run `npm run build` first.");
 }
 const args = process.argv.slice(2);
+const getArg = (name) => {
+  const exact = args.find((a) => a.startsWith(`--${name}=`));
+  return exact ? exact.slice(name.length + 3) : null;
+};
+const readNumberArg = (name) => {
+  const raw = getArg(name);
+  if (raw === null || raw === "") return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 const debugMode = args.includes("--debug");
-const canvasOutputPath = path.join(projectRoot, "output", debugMode ? "headless-debug-canvas.png" : "headless-shot.png");
-const pageOutputPath = path.join(projectRoot, "output", debugMode ? "headless-debug-page.png" : "headless-page.png");
+const scene = getArg("scene");
+const hour = readNumberArg("hour");
+const hourRate = readNumberArg("hour-rate");
+const azimuth = readNumberArg("azimuth");
+const polar = readNumberArg("polar");
+const distance = readNumberArg("distance");
+const targetX = readNumberArg("target-x");
+const targetY = readNumberArg("target-y");
+const targetZ = readNumberArg("target-z");
+const waitMs = Math.max(100, readNumberArg("wait-ms") ?? 1800);
+const outputName = getArg("name");
+const slug = outputName
+  || [
+    "headless",
+    scene || "default",
+    hour !== null ? `h${String(hour).replace(".", "_")}` : null,
+    debugMode ? "debug" : null,
+  ].filter(Boolean).join("-");
+const canvasOutputPath = path.join(projectRoot, "output", `${slug}-canvas.png`);
+const pageOutputPath = path.join(projectRoot, "output", `${slug}-page.png`);
 
 const mime = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".png": "image/png",
+  ".glb": "model/gltf-binary",
 };
 
 const server = http.createServer((req, res) => {
@@ -72,9 +101,29 @@ try {
     if (msg.type() === "error") pageErrors.push(`console.error: ${msg.text()}`);
   });
 
-  const route = debugMode ? "/?debug=1" : "/";
+  const search = new URLSearchParams();
+  if (debugMode) search.set("debug", "1");
+  if (scene) search.set("scene", scene);
+  if (hour !== null) search.set("binaryHour", String(hour));
+  if (hourRate !== null) search.set("binaryHourRate", String(hourRate));
+  const route = `/${search.size ? `?${search.toString()}` : ""}`;
   await page.goto(`http://127.0.0.1:${port}${route}`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(waitMs);
+  if (azimuth !== null || polar !== null || distance !== null || targetX !== null || targetY !== null || targetZ !== null) {
+    await page.evaluate((view) => {
+      if (typeof window.__setOrbitView === "function") {
+        window.__setOrbitView(view);
+      }
+    }, {
+      azimuth,
+      polar,
+      distance,
+      targetX,
+      targetY,
+      targetZ,
+    });
+    await page.waitForTimeout(120);
+  }
   await page.screenshot({ path: pageOutputPath, fullPage: true });
   const canvasPngDataUrl = await page.evaluate(() => {
     const canvas = window.__canvas || document.querySelector("canvas");
@@ -114,6 +163,7 @@ try {
       diagnostics.state.lastTime,
     ).toFixed(2)}s bg=${diagnostics.bodyBg}`,
   );
+  console.log(`Route: ${route}`);
   console.log(`Debug: ${JSON.stringify(diagnostics.state.debug || {})}`);
   console.log(`Canvas screenshot: ${canvasOutputPath}`);
   console.log(`Page screenshot: ${pageOutputPath}`);

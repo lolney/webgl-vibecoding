@@ -9,12 +9,19 @@ import { Water } from "three/examples/jsm/objects/Water.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import towerAssetUrl from "./assets/tower_asset.glb?url";
 import cityModuleAssetUrl from "./assets/city_module_asset.glb?url";
+import { clocktowerScene } from "./scenes/clocktowerScene.js";
+import { binaryExternalScene } from "./scenes/binaryExternalScene.js";
+import { binarySurfaceScene } from "./scenes/binarySurfaceScene.js";
+import { createSceneManager } from "./scenes/sceneManager.js";
+import { createHudPrimitive } from "./ui/hudPrimitive.js";
+import { updateBinaryScene } from "./scenes/controllers/binarySceneController.js";
+import { updateClocktowerScene } from "./scenes/controllers/clocktowerSceneController.js";
+import { applySceneModeInternal } from "./scenes/controllers/sceneModeController.js";
 
 const canvas = document.getElementById("gl");
-const sceneChooser = document.getElementById("sceneChooser");
 const audioButton = document.getElementById("audioToggle");
-const modeBadge = document.getElementById("modeBadge");
-const timeIndicator = document.getElementById("timeIndicator");
+const hud = createHudPrimitive();
+const { sceneChooser, modeBadge, timeIndicator } = hud.elements;
 const query = new URLSearchParams(window.location.search);
 const debugView = query.get("debug") === "1";
 const initialSceneQuery = query.get("scene");
@@ -65,7 +72,7 @@ function loadGLTF(url) {
   });
 }
 
-const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 140);
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 320);
 camera.position.set(0.0, 3.2, 18.0);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -247,6 +254,7 @@ scene.add(stars);
 
 const binarySystemGroup = new THREE.Group();
 binarySystemGroup.visible = false;
+binarySystemGroup.scale.setScalar(0.65);
 scene.add(binarySystemGroup);
 
 const orbitLineMat = new THREE.LineBasicMaterial({ color: 0x6caeff, transparent: true, opacity: 0.35 });
@@ -262,15 +270,15 @@ function makeOrbitLine(radius, color = 0x6caeff) {
 
 const starAGroup = new THREE.Group();
 const starAMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(1.7, 32, 24),
-  new THREE.MeshBasicMaterial({ color: 0xfff4c2 }),
+  new THREE.SphereGeometry(3.2, 36, 28),
+  new THREE.MeshBasicMaterial({ color: 0xfff4c2, toneMapped: false }),
 );
 const starAHalo = new THREE.Mesh(
-  new THREE.SphereGeometry(2.6, 20, 16),
+  new THREE.SphereGeometry(4.9, 24, 20),
   new THREE.MeshBasicMaterial({
     color: 0xffd57a,
     transparent: true,
-    opacity: 0.26,
+    opacity: 0.44,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   }),
@@ -281,15 +289,15 @@ binarySystemGroup.add(starAGroup);
 
 const starBGroup = new THREE.Group();
 const starBMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(1.15, 28, 20),
-  new THREE.MeshBasicMaterial({ color: 0xbfd4ff }),
+  new THREE.SphereGeometry(2.5, 32, 24),
+  new THREE.MeshBasicMaterial({ color: 0xbfd4ff, toneMapped: false }),
 );
 const starBHalo = new THREE.Mesh(
-  new THREE.SphereGeometry(2.0, 18, 14),
+  new THREE.SphereGeometry(3.9, 20, 16),
   new THREE.MeshBasicMaterial({
     color: 0x7ca7ff,
     transparent: true,
-    opacity: 0.24,
+    opacity: 0.42,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   }),
@@ -303,35 +311,86 @@ const binaryStarBLight = new THREE.PointLight(0xbfd4ff, 4800, 210, 2.0);
 scene.add(binaryStarALight);
 scene.add(binaryStarBLight);
 
-const planetOrbitRadius = 13.8;
+const planetOrbitRadius = 16.5;
 const planetGroup = new THREE.Group();
 const planetPivot = new THREE.Group();
 binarySystemGroup.add(planetPivot);
 planetPivot.add(planetGroup);
 
 const planetMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(2.9, 64, 48),
+  new THREE.SphereGeometry(1.55, 64, 48),
   new THREE.MeshPhysicalMaterial({
-    color: 0x3a6fd1,
-    roughness: 0.92,
-    metalness: 0.04,
-    clearcoat: 0.08,
-    clearcoatRoughness: 0.55,
+    color: 0x315f8a,
+    roughness: 1.0,
+    metalness: 0.0,
+    clearcoat: 0.02,
+    clearcoatRoughness: 0.92,
   }),
 );
 planetGroup.add(planetMesh);
 
 const cloudLayer = new THREE.Mesh(
-  new THREE.SphereGeometry(2.99, 40, 32),
+  new THREE.SphereGeometry(1.64, 40, 32),
   new THREE.MeshPhysicalMaterial({
     color: 0xbcd6ff,
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.13,
     roughness: 0.8,
     metalness: 0.02,
   }),
 );
 planetGroup.add(cloudLayer);
+
+const planetAtmosphere = new THREE.Mesh(
+  new THREE.SphereGeometry(1.72, 48, 36),
+  new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide,
+    uniforms: {
+      uColor: { value: new THREE.Color(0x7db7ff) },
+      uPower: { value: 3.2 },
+      uIntensity: { value: 0.48 },
+    },
+    vertexShader: `
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vNormal = normalize(normalMatrix * normal);
+        vView = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uPower;
+      uniform float uIntensity;
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        float rim = pow(max(0.0, 1.0 - dot(normalize(vNormal), normalize(vView))), uPower);
+        gl_FragColor = vec4(uColor * rim * uIntensity, rim * 0.7);
+      }
+    `,
+  }),
+);
+planetGroup.add(planetAtmosphere);
+
+const planetRing = new THREE.Mesh(
+  new THREE.RingGeometry(1.95, 2.45, 80),
+  new THREE.MeshBasicMaterial({
+    color: 0x89ccff,
+    transparent: true,
+    opacity: 0.32,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  }),
+);
+planetRing.rotation.x = Math.PI * 0.34;
+planetGroup.add(planetRing);
 
 const binaryBaryOrbit = makeOrbitLine(4.8, 0xff8de6);
 binarySystemGroup.add(binaryBaryOrbit);
@@ -397,9 +456,15 @@ const surfaceSky = new THREE.Mesh(
         vec3 base = mix(mix(nightCol, twiCol, uTwilight), dayCol, uDay);
         float horizonBand = smoothstep(0.02, 0.22, h) * (1.0 - smoothstep(0.22, 0.35, h));
         base += vec3(1.0, 0.42, 0.22) * horizonBand * uTwilight * 0.35;
-        float glowA = pow(max(dot(dir, normalize(uA)), 0.0), 22.0);
-        float glowB = pow(max(dot(dir, normalize(uB)), 0.0), 20.0) * uSecond;
-        vec3 col = base + vec3(1.0, 0.72, 0.36) * glowA * 0.95 + vec3(0.6, 0.78, 1.0) * glowB * 1.25;
+        float dA = dot(dir, normalize(uA));
+        float dB = dot(dir, normalize(uB));
+        float glowA = pow(max(dA, 0.0), 10.5);
+        float glowB = pow(max(dB, 0.0), 10.8) * uSecond;
+        float sunA = smoothstep(0.9972, 0.9992, dA);
+        float sunB = smoothstep(0.9974, 0.99925, dB) * uSecond;
+        vec3 col = base + vec3(1.0, 0.72, 0.36) * glowA * 0.58 + vec3(0.6, 0.78, 1.0) * glowB * 0.82;
+        col += vec3(1.0, 0.93, 0.78) * sunA * 1.7;
+        col += vec3(0.72, 0.86, 1.0) * sunB * 1.55;
         gl_FragColor = vec4(col, 1.0);
       }
     `,
@@ -408,7 +473,7 @@ const surfaceSky = new THREE.Mesh(
 surfacePovGroup.add(surfaceSky);
 
 const surfaceGround = new THREE.Mesh(
-  new THREE.PlaneGeometry(220, 220, 1, 1),
+  new THREE.PlaneGeometry(20000, 20000, 1, 1),
   new THREE.MeshPhysicalMaterial({
     color: 0x182337,
     roughness: 0.98,
@@ -419,6 +484,7 @@ const surfaceGround = new THREE.Mesh(
 );
 surfaceGround.rotation.x = -Math.PI / 2;
 surfaceGround.position.y = -0.02;
+surfaceGround.visible = false;
 surfacePovGroup.add(surfaceGround);
 
 let surfaceOcean = null;
@@ -426,8 +492,35 @@ let surfaceOcean = null;
 function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
   const g = new THREE.Group();
   const core = new THREE.Mesh(
-    new THREE.SphereGeometry(coreSize, 24, 16),
-    new THREE.MeshBasicMaterial({ color: coreColor, depthTest: false, toneMapped: false }),
+    new THREE.PlaneGeometry(coreSize * 2.0, coreSize * 2.0),
+    new THREE.ShaderMaterial({
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: {
+        uColor: { value: new THREE.Color(coreColor) },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        varying vec2 vUv;
+        void main() {
+          vec2 p = vUv - 0.5;
+          float d = length(p);
+          float disc = smoothstep(0.5, 0.0, d);
+          float edge = smoothstep(0.5, 0.42, d) * 0.22;
+          float a = clamp(disc + edge, 0.0, 1.0);
+          gl_FragColor = vec4(uColor * (disc * 1.15 + edge), a);
+        }
+      `,
+    }),
   );
   core.renderOrder = 120;
   const glow = new THREE.Mesh(
@@ -469,13 +562,15 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
   return { group: g, core, glow };
 }
 
-const surfaceSunA = makeSurfaceSun(0xfff2be, 0xffcb6d, 1.8, 12);
-const surfaceSunB = makeSurfaceSun(0xc6dbff, 0x7eb1ff, 1.2, 9);
+const surfaceSunA = makeSurfaceSun(0xfff2be, 0xffcb6d, 0.08, 0.55);
+const surfaceSunB = makeSurfaceSun(0xc6dbff, 0x7eb1ff, 0.065, 0.42);
+surfaceSunA.group.visible = false;
+surfaceSunB.group.visible = false;
 surfacePovGroup.add(surfaceSunA.group);
 surfacePovGroup.add(surfaceSunB.group);
 
 const surfaceReflectionA = new THREE.Mesh(
-  new THREE.PlaneGeometry(20, 90),
+  new THREE.PlaneGeometry(8, 160),
   new THREE.MeshBasicMaterial({
     color: 0xffd48b,
     transparent: true,
@@ -487,10 +582,11 @@ const surfaceReflectionA = new THREE.Mesh(
 );
 surfaceReflectionA.rotation.x = -Math.PI / 2;
 surfaceReflectionA.position.set(0, 0.05, -70);
+surfaceReflectionA.visible = false;
 surfacePovGroup.add(surfaceReflectionA);
 
 const surfaceReflectionB = new THREE.Mesh(
-  new THREE.PlaneGeometry(16, 82),
+  new THREE.PlaneGeometry(6, 140),
   new THREE.MeshBasicMaterial({
     color: 0x8dc2ff,
     transparent: true,
@@ -502,6 +598,7 @@ const surfaceReflectionB = new THREE.Mesh(
 );
 surfaceReflectionB.rotation.x = -Math.PI / 2;
 surfaceReflectionB.position.set(-8, 0.05, -72);
+surfaceReflectionB.visible = false;
 surfacePovGroup.add(surfaceReflectionB);
 
 function makeWaterNormalsTexture(size = 256) {
@@ -526,7 +623,7 @@ function makeWaterNormalsTexture(size = 256) {
 }
 
 const waterNormals = makeWaterNormalsTexture(256);
-surfaceOcean = new Water(new THREE.PlaneGeometry(220, 220, 100, 100), {
+surfaceOcean = new Water(new THREE.PlaneGeometry(20000, 20000, 120, 120), {
   textureWidth: 1024,
   textureHeight: 1024,
   waterNormals,
@@ -538,7 +635,7 @@ surfaceOcean = new Water(new THREE.PlaneGeometry(220, 220, 100, 100), {
   alpha: 0.96,
 });
 surfaceOcean.rotation.x = -Math.PI / 2;
-surfaceOcean.position.set(0, 0.01, -95);
+surfaceOcean.position.set(0, 0.01, 0);
 surfaceOcean.material.uniforms.size.value = 1.9;
 surfacePovGroup.add(surfaceOcean);
 const shorelineZ = -1.35;
@@ -1137,11 +1234,12 @@ Promise.all([loadGLTF(towerAssetUrl), loadGLTF(cityModuleAssetUrl)])
   });
 
 let activeSceneKey = "clocktower";
-const sceneLabels = {
-  clocktower: "Clocktower",
-  binaryExternal: "Binary External",
-  binarySurface: "Binary Surface POV",
-};
+const sceneDefinitions = [clocktowerScene, binaryExternalScene, binarySurfaceScene];
+const sceneManager = createSceneManager({ sceneDefs: sceneDefinitions });
+const sceneByKey = Object.fromEntries(sceneDefinitions.map((sceneDef) => [sceneDef.key, sceneDef]));
+const sceneLabels = Object.fromEntries(sceneDefinitions.map((sceneDef) => [sceneDef.key, sceneDef.label]));
+hud.setSceneOptions(sceneDefinitions);
+hud.setTitle("NEON CLOCKTOWER // DEMOSCENE CUT");
 let binaryDayHours = binaryHourQuery !== null ? THREE.MathUtils.euclideanModulo(binaryHourQuery, 24) : 13.2;
 const binaryHourRate = binaryHourRateQuery !== null ? binaryHourRateQuery : 0.12;
 let lastTickTime = 0;
@@ -1173,6 +1271,9 @@ const clocktowerObjects = [
   blenderCityRoot,
   ringGroup,
   strobeRig,
+  ...strobeSpots,
+  ...strobeTargets,
+  ...strobeCones,
   ocean,
   farOcean,
   ground,
@@ -1187,49 +1288,32 @@ const clocktowerObjects = [
 const binaryObjects = [binarySystemGroup, starAGroup, starBGroup, planetOrbitLine, binaryBaryOrbit, surfacePovGroup];
 
 function applySceneMode(nextSceneKey, options = {}) {
-  const { syncUrl = true, pushHistory = false } = options;
-  activeSceneKey = sceneLabels[nextSceneKey] ? nextSceneKey : "clocktower";
-  const isClocktower = activeSceneKey === "clocktower";
-
-  for (const obj of clocktowerObjects) obj.visible = isClocktower;
-  for (const obj of binaryObjects) obj.visible = !isClocktower;
-  surfacePovGroup.visible = activeSceneKey === "binarySurface";
-  surfaceForeground.visible = activeSceneKey === "binarySurface";
-
-  binaryStarALight.visible = !isClocktower;
-  binaryStarBLight.visible = !isClocktower;
-  binaryFill.visible = !isClocktower;
-
-  key.visible = isClocktower;
-  rim.visible = isClocktower;
-  beamLight.visible = isClocktower;
-  moon.visible = isClocktower;
-
-  if (isClocktower) {
-    camera.up.set(0, 1, 0);
-    controls.target.set(0, 2.2, 0);
-    planetMesh.visible = true;
-    cloudLayer.visible = true;
-    if (timeIndicator) timeIndicator.textContent = "Time --:--";
-    if (sceneChooser) sceneChooser.value = "clocktower";
-  } else if (activeSceneKey === "binaryExternal") {
-    camera.up.set(0, 1, 0);
-    controls.target.set(0, 0, 0);
-    planetMesh.visible = true;
-    cloudLayer.visible = true;
-    if (sceneChooser) sceneChooser.value = "binaryExternal";
-  } else {
-    controls.target.set(0, 0, 0);
-    planetMesh.visible = false;
-    cloudLayer.visible = false;
-    camera.up.set(0, 1, 0);
-    camera.position.set(0, 1.65, 13.0);
-    controls.target.set(0, 1.2, -70);
-    if (sceneChooser) sceneChooser.value = "binarySurface";
-  }
-  controls.update();
-  setCinematic(false);
-  if (syncUrl) syncSceneToUrl(activeSceneKey, { pushHistory });
+  activeSceneKey = applySceneModeInternal({
+    nextSceneKey,
+    options,
+    sceneManager,
+    sceneByKey,
+    clocktowerScene,
+    clocktowerObjects,
+    binaryObjects,
+    surfacePovGroup,
+    surfaceForeground,
+    controls,
+    camera,
+    binaryStarALight,
+    binaryStarBLight,
+    binaryFill,
+    key,
+    rim,
+    beamLight,
+    moon,
+    planetMesh,
+    cloudLayer,
+    hud,
+    timeIndicator,
+    syncSceneToUrl,
+    setCinematic,
+  });
 }
 
 function createSynth() {
@@ -1465,7 +1549,7 @@ function setCinematic(on) {
 }
 
 setCinematic(false);
-applySceneMode(sceneLabels[initialSceneQuery] ? initialSceneQuery : "clocktower");
+applySceneMode(sceneByKey[initialSceneQuery] ? initialSceneQuery : "clocktower");
 if (debugView) {
   modeBadge.textContent = "Debug Camera // Geometry";
 }
@@ -1500,7 +1584,7 @@ if (sceneChooser) {
 }
 window.addEventListener("popstate", () => {
   const fromUrl = new URLSearchParams(window.location.search).get("scene");
-  applySceneMode(sceneLabels[fromUrl] ? fromUrl : "clocktower", { syncUrl: false });
+  applySceneMode(sceneByKey[fromUrl] ? fromUrl : "clocktower", { syncUrl: false });
 });
 
 window.__demoState = { ok: true, frames: 0, lastTime: 0, debug: {} };
@@ -1509,6 +1593,34 @@ window.__setBinaryTime = (hours) => {
   if (Number.isFinite(hours)) binaryDayHours = THREE.MathUtils.euclideanModulo(hours, 24);
 };
 window.__getBinaryTime = () => binaryDayHours;
+window.__setScene = (sceneKey) => {
+  applySceneMode(sceneByKey[sceneKey] ? sceneKey : "clocktower");
+};
+window.__setOrbitView = (view = {}) => {
+  const azimuth = Number.isFinite(view.azimuth) ? view.azimuth : 0;
+  const polar = Number.isFinite(view.polar) ? view.polar : Math.PI * 0.52;
+  const distance = Number.isFinite(view.distance) ? view.distance : 12;
+  const tx = Number.isFinite(view.targetX) ? view.targetX : controls.target.x;
+  const ty = Number.isFinite(view.targetY) ? view.targetY : controls.target.y;
+  const tz = Number.isFinite(view.targetZ) ? view.targetZ : controls.target.z;
+  controls.target.set(tx, ty, tz);
+  const s = new THREE.Spherical(
+    THREE.MathUtils.clamp(distance, controls.minDistance, controls.maxDistance),
+    THREE.MathUtils.clamp(polar, controls.minPolarAngle, controls.maxPolarAngle),
+    azimuth,
+  );
+  const offset = new THREE.Vector3().setFromSpherical(s);
+  camera.position.copy(controls.target).add(offset);
+  if (activeSceneKey === "binarySurface" && camera.position.y < 1.05) camera.position.y = 1.05;
+  camera.up.set(0, 1, 0);
+  controls.update();
+  return {
+    azimuth: controls.getAzimuthalAngle(),
+    polar: controls.getPolarAngle(),
+    distance: camera.position.distanceTo(controls.target),
+    target: controls.target.toArray(),
+  };
+};
 
 const clock = new THREE.Clock();
 const tmpColor = new THREE.Color();
@@ -1538,11 +1650,6 @@ function displaceWaterGeometry(geometry, basePositions, time, amp = 1.0) {
   geometry.computeVertexNormals();
 }
 
-function smoothstep(edge0, edge1, x) {
-  const t = THREE.MathUtils.clamp((x - edge0) / (edge1 - edge0), 0, 1);
-  return t * t * (3 - 2 * t);
-}
-
 function onResize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -1552,6 +1659,94 @@ function onResize() {
   composer.setSize(w, h);
 }
 window.addEventListener("resize", onResize);
+
+const binaryControllerCtx = {
+  camera,
+  controls,
+  renderer,
+  scene,
+  composer,
+  stars,
+  sky,
+  ambient,
+  binaryFill,
+  binaryStarALight,
+  binaryStarBLight,
+  planetAtmosphere,
+  starAGroup,
+  starBGroup,
+  planetPivot,
+  planetGroup,
+  cloudLayer,
+  surfaceGround,
+  surfaceSky,
+  surfaceOcean,
+  surfaceSunA,
+  surfaceSunB,
+  surfaceReflectionA,
+  surfaceReflectionB,
+  bloomPass,
+  crtPass,
+  timeIndicator,
+  format24Hour,
+  planetOrbitRadius,
+};
+
+const clocktowerControllerCtx = {
+  camera,
+  controls,
+  renderer,
+  scene,
+  composer,
+  stars,
+  sky,
+  ambient,
+  key,
+  rim,
+  moon,
+  moonVisual,
+  moonHalo,
+  moonReflection,
+  moonReflectionWide,
+  moonDir,
+  moonBase,
+  shorelineZ,
+  beamLight,
+  beaconBeam,
+  ocean,
+  oceanGeometry,
+  oceanBasePos,
+  farOcean,
+  farOceanGeometry,
+  farOceanBasePos,
+  strobeRig,
+  strobeSpots,
+  strobeTargets,
+  strobeCones,
+  ringGroup,
+  city,
+  cityCount,
+  cityData,
+  tmpColor,
+  tmpDir,
+  upAxis,
+  bloomPieces,
+  ground,
+  shoreline,
+  bloomPass,
+  crtPass,
+  sectionNames,
+  usingBlenderTower,
+  usingBlenderCity,
+  blenderTowerRoot,
+  towerGroup,
+  minuteHand,
+  hourHand,
+  blenderMinuteHand,
+  blenderHourHand,
+  debugView,
+  displaceWaterGeometry,
+};
 
 function tick() {
   const t = clock.getElapsedTime();
@@ -1567,368 +1762,33 @@ function tick() {
   }
 
   controls.update();
-
   const shouldCinematicBlend = cinematic;
   cinematicMix = THREE.MathUtils.lerp(cinematicMix, shouldCinematicBlend ? 1 : 0, 0.02);
-
   binaryDayHours = THREE.MathUtils.euclideanModulo(binaryDayHours + dt * binaryHourRate, 24);
 
+  let sceneDebug = {};
   if (activeSceneKey !== "clocktower") {
-    const sysT = t * 0.24;
-    const baryRadiusA = 2.2;
-    const baryRadiusB = 2.9;
-    starAGroup.position.set(Math.cos(sysT) * baryRadiusA, Math.sin(sysT * 0.35) * 0.35, Math.sin(sysT) * baryRadiusA);
-    starBGroup.position.set(
-      -Math.cos(sysT * 1.03) * baryRadiusB,
-      Math.cos(sysT * 0.42) * 0.45,
-      -Math.sin(sysT * 1.03) * baryRadiusB,
-    );
-
-    binaryStarALight.position.copy(starAGroup.position);
-    binaryStarBLight.position.copy(starBGroup.position);
-
-    const planetOrbitA = sysT * 0.38;
-    planetPivot.position.set(Math.cos(planetOrbitA) * planetOrbitRadius, 0, Math.sin(planetOrbitA) * planetOrbitRadius);
-    planetGroup.rotation.y = t * 0.25;
-    cloudLayer.rotation.y = -t * 0.17;
-
-    const dayPhase = binaryDayHours / 24;
-    const primaryAltitude = Math.sin((dayPhase - 0.25) * Math.PI * 2);
-    const secondSunStart = 18.48;
-    const secondSunEnd = 18.78;
-    const secondWindow = smoothstep(secondSunStart, secondSunStart + 0.02, binaryDayHours)
-      * (1 - smoothstep(secondSunEnd - 0.02, secondSunEnd, binaryDayHours));
-    const secondArc = THREE.MathUtils.clamp(
-      (binaryDayHours - secondSunStart) / Math.max(0.0001, secondSunEnd - secondSunStart),
-      0,
-      1,
-    );
-    const secondaryAltitude = Math.sin(secondArc * Math.PI) * secondWindow;
-
-    const dayStrength = THREE.MathUtils.clamp(primaryAltitude * 1.15, 0, 1);
-    const secondStrength = THREE.MathUtils.clamp(secondaryAltitude * 2.6, 0, 1);
-    const daylight = smoothstep(-0.12, 0.25, primaryAltitude);
-    const twilight = smoothstep(-0.24, -0.02, primaryAltitude) * (1 - smoothstep(0.15, 0.5, primaryAltitude));
-    const nightness = 1 - daylight;
-
-    if (activeSceneKey !== "clocktower") {
-      ambient.intensity = 0.1 + daylight * 0.28 + secondStrength * 0.16;
-      ambient.color.setRGB(
-        THREE.MathUtils.lerp(0.25, 0.56, daylight),
-        THREE.MathUtils.lerp(0.32, 0.72, daylight),
-        THREE.MathUtils.lerp(0.58, 0.92, daylight),
-      );
-      scene.fog.color.setRGB(
-        THREE.MathUtils.lerp(0.01, 0.23, daylight),
-        THREE.MathUtils.lerp(0.02, 0.35, daylight),
-        THREE.MathUtils.lerp(0.07, 0.52, daylight),
-      );
-      scene.background.setRGB(
-        THREE.MathUtils.lerp(0.004, 0.2, daylight),
-        THREE.MathUtils.lerp(0.01, 0.3, daylight),
-        THREE.MathUtils.lerp(0.04, 0.5, daylight),
-      );
-      scene.fog.density = THREE.MathUtils.lerp(0.072, 0.038, daylight);
-      renderer.toneMappingExposure = THREE.MathUtils.lerp(0.5, 0.86, daylight) + secondStrength * 0.05;
-      stars.material.opacity = THREE.MathUtils.lerp(0.92, 0.08, daylight);
-    }
-
-    binaryStarALight.intensity = 2200 + dayStrength * 6200;
-    binaryStarBLight.intensity = 260 + secondStrength * 4200;
-    binaryFill.intensity = 0.12 + daylight * 0.75 + secondStrength * 0.24;
-    if (timeIndicator) {
-      const phaseText = secondStrength > 0.06 ? "2nd Sun" : dayStrength > 0.05 ? "Day" : "Night";
-      timeIndicator.textContent = `Time ${format24Hour(binaryDayHours)} ${phaseText}`;
-    }
-
-    if (activeSceneKey === "binaryExternal") {
-      const autoAngleBinary = t * 0.11;
-      const extAutoPos = new THREE.Vector3(
-        Math.cos(autoAngleBinary) * 32,
-        12 + Math.sin(t * 0.13) * 3,
-        Math.sin(autoAngleBinary) * 32,
-      );
-      camera.position.lerp(extAutoPos, cinematicMix * 0.05);
-      controls.target.lerp(new THREE.Vector3(0, 0, 0), cinematicMix * 0.06);
-      surfaceForeground.visible = false;
-    } else {
-      const primaryAz = Math.sin((binaryDayHours - 12) * 0.18) * 0.4;
-      const primaryAlt = primaryAltitude * (Math.PI * 0.38);
-      const secondaryAz = -0.32;
-      const secondaryAlt = (-0.03 + secondaryAltitude * 0.08) * Math.PI;
-      const dirFromAzAlt = (az, alt) =>
-        new THREE.Vector3(
-          Math.sin(az) * Math.cos(alt),
-          Math.sin(alt),
-          -Math.cos(az) * Math.cos(alt),
-        ).normalize();
-      const primaryDir = dirFromAzAlt(primaryAz, primaryAlt);
-      const secondaryDir = dirFromAzAlt(secondaryAz, secondaryAlt);
-
-      if (cinematicMix > 0.001) {
-        const surfCam = new THREE.Vector3(Math.sin(t * 0.055) * 6.0, 1.7 + Math.sin(t * 0.07) * 0.08, 12.5);
-        const surfTarget = new THREE.Vector3(Math.sin(t * 0.04) * 8.0, 1.2, -86);
-        camera.position.lerp(surfCam, cinematicMix * 0.045);
-        controls.target.lerp(surfTarget, cinematicMix * 0.05);
-      }
-      if (camera.position.y < 1.0) camera.position.y = 1.0;
-      camera.up.set(0, 1, 0);
-
-      surfaceSky.position.copy(camera.position);
-      surfaceGround.position.x = camera.position.x;
-      surfaceGround.position.z = camera.position.z - 35;
-      surfaceOcean.position.x = camera.position.x;
-      surfaceOcean.position.z = camera.position.z - 95;
-      surfaceOcean.material.uniforms.time.value = t * 0.42;
-
-      const mixedSunDir = primaryDir
-        .clone()
-        .multiplyScalar(Math.max(0.05, dayStrength))
-        .add(secondaryDir.clone().multiplyScalar(Math.max(0.0, secondStrength * 1.2)))
-        .normalize();
-      surfaceOcean.material.uniforms.sunDirection.value.copy(mixedSunDir);
-      surfaceOcean.material.uniforms.distortionScale.value = 1.6 + beat * 1.2 + nightness * 1.1 + twilight * 0.45;
-      surfaceOcean.material.uniforms.waterColor.value.setRGB(
-        THREE.MathUtils.lerp(0.03, 0.09, daylight),
-        THREE.MathUtils.lerp(0.1, 0.35, daylight),
-        THREE.MathUtils.lerp(0.24, 0.62, daylight),
-      );
-
-      const sunAPos = camera.position.clone().add(primaryDir.clone().multiplyScalar(92));
-      const sunBPos = camera.position.clone().add(secondaryDir.clone().multiplyScalar(88));
-      surfaceSunA.group.position.copy(sunAPos);
-      surfaceSunB.group.position.copy(sunBPos);
-      surfaceSunA.group.lookAt(camera.position);
-      surfaceSunB.group.lookAt(camera.position);
-      surfaceSunA.group.visible = primaryDir.y > -0.28;
-      surfaceSunB.group.visible = secondaryDir.y > -0.15 && secondWindow > 0.01;
-      surfaceSunA.glow.material.uniforms.uStrength.value = 0.75 + dayStrength * 0.85;
-      surfaceSunB.glow.material.uniforms.uStrength.value = 0.55 + secondStrength * 1.1;
-      surfaceSunA.core.scale.setScalar(1.05 + dayStrength * 0.35);
-      surfaceSunB.core.scale.setScalar(0.95 + secondStrength * 0.6);
-
-      surfaceReflectionA.position.x = camera.position.x + primaryDir.x * 42;
-      surfaceReflectionA.position.z = camera.position.z - 74 + primaryDir.z * 16;
-      surfaceReflectionA.material.opacity = THREE.MathUtils.clamp(
-        primaryDir.y * 1.25 + dayStrength * 0.62 + twilight * 0.35,
-        0,
-        0.92,
-      );
-      surfaceReflectionA.scale.x = 0.9 + (1 - Math.abs(primaryDir.x)) * 0.9;
-      surfaceReflectionA.scale.y = 1.0 + twilight * 0.28;
-
-      surfaceReflectionB.position.x = camera.position.x + secondaryDir.x * 40;
-      surfaceReflectionB.position.z = camera.position.z - 74 + secondaryDir.z * 16;
-      surfaceReflectionB.material.opacity = THREE.MathUtils.clamp(secondStrength * 0.92, 0, 0.8);
-      surfaceReflectionB.scale.x = 0.85 + secondStrength * 0.7;
-      surfaceReflectionB.scale.y = 1.0 + secondStrength * 0.34;
-
-      binaryStarALight.position.copy(camera.position).add(primaryDir.clone().multiplyScalar(76));
-      binaryStarBLight.position.copy(camera.position).add(secondaryDir.clone().multiplyScalar(70));
-      binaryStarALight.intensity = 150 + dayStrength * 9000;
-      binaryStarBLight.intensity = 40 + secondStrength * 8200;
-      binaryFill.intensity = 0.25 + dayStrength * 0.38 + secondStrength * 0.3;
-
-      const fgPos = camera.position.clone().add(new THREE.Vector3(0, -1.08, -8.0));
-      surfaceForeground.position.lerp(fgPos, 0.14);
-      surfaceForeground.rotation.x = -Math.PI / 2;
-      surfaceForeground.material.emissiveIntensity = 0.03 + daylight * 0.42 + twilight * 0.22 + secondStrength * 0.25;
-      surfaceGround.material.color.setRGB(
-        THREE.MathUtils.lerp(0.04, 0.22, daylight),
-        THREE.MathUtils.lerp(0.06, 0.28, daylight),
-        THREE.MathUtils.lerp(0.11, 0.33, daylight),
-      );
-      surfaceSky.material.uniforms.uDay.value = THREE.MathUtils.clamp(daylight, 0.0, 1.0);
-      surfaceSky.material.uniforms.uTwilight.value = THREE.MathUtils.clamp(twilight, 0.0, 1.0);
-      surfaceSky.material.uniforms.uSecond.value = secondStrength;
-      surfaceSky.material.uniforms.uA.value.copy(primaryDir);
-      surfaceSky.material.uniforms.uB.value.copy(secondaryDir);
-    }
-
-    stars.rotation.y = t * 0.004;
-    sky.rotation.y = -t * 0.003;
-    bloomPass.strength = 0.5 + dayStrength * 0.35 + secondStrength * 0.5 + beat * 0.2;
-    bloomPass.radius = 0.24 + secondStrength * 0.12;
-    bloomPass.threshold = 0.84 - secondStrength * 0.08;
-    crtPass.uniforms.uTime.value = t;
-    crtPass.uniforms.uBeat.value = Math.min(1.0, beat * 0.9 + level * 0.35);
-    crtPass.uniforms.uGlitch.value = 0.12 + secondStrength * 0.25;
-
-    if (debugView) {
-      renderer.render(scene, camera);
-    } else {
-      composer.render();
-    }
-
-    window.__demoState.frames += 1;
-    window.__demoState.lastTime = t;
-    window.__demoState.debug = {
-      triangles: renderer.info.render.triangles,
-      calls: renderer.info.render.calls,
-      points: renderer.info.render.points,
-      level: Number(level.toFixed(3)),
-      beat: Number(beat.toFixed(3)),
-      scene: activeSceneKey,
-      dayPhase: Number(dayPhase.toFixed(3)),
-      time24: format24Hour(binaryDayHours),
-      secondSun: Number(secondStrength.toFixed(3)),
-      cinematicMix: Number(cinematicMix.toFixed(3)),
-      blenderTower: usingBlenderTower,
-      blenderCity: usingBlenderCity,
+    sceneDebug = updateBinaryScene(binaryControllerCtx, {
+      t,
+      beat,
+      level,
+      cinematicMix,
+      activeSceneKey,
+      binaryDayHours,
       debugView,
-    };
-
-    requestAnimationFrame(tick);
-    return;
-  }
-
-  const autoAngle = t * 0.19;
-  renderer.toneMappingExposure = 0.62;
-  ambient.intensity = 0.56;
-  ambient.color.setHex(0x3346bb);
-  scene.background.setHex(0x02030f);
-  scene.fog.color.setHex(0x02030f);
-  scene.fog.density = 0.065;
-  stars.material.opacity = 0.86;
-  const autoRadius = 7.2 + Math.sin(t * 0.37) * 1.4;
-  const autoPos = new THREE.Vector3(
-    Math.cos(autoAngle) * autoRadius,
-    2.6 + Math.sin(t * 0.24) * 1.1,
-    Math.sin(autoAngle) * autoRadius,
-  );
-
-  camera.position.lerp(autoPos, cinematicMix * 0.04);
-  controls.target.lerp(new THREE.Vector3(0, 1.45 + Math.sin(t * 0.9) * 0.12, 0), cinematicMix * 0.04);
-
-  const activeTower = usingBlenderTower ? blenderTowerRoot : towerGroup;
-  activeTower.rotation.y = Math.sin(t * 0.25) * 0.08 + beat * 0.1;
-  activeTower.position.y = Math.sin(t * 0.9) * 0.035 + beat * 0.05;
-
-  if (!usingBlenderTower) {
-    minuteHand.rotation.z = -t * 1.85;
-    hourHand.rotation.z = -t * 0.39;
+    });
   } else {
-    if (blenderMinuteHand) blenderMinuteHand.rotation.y = -t * 1.85;
-    if (blenderHourHand) blenderHourHand.rotation.y = -t * 0.39;
-  }
-
-  const pulse = 0.45 + level * 0.85 + beat * 1.2;
-  const sectionBoost = section === 1 ? 1.22 : section === 3 ? 1.34 : 1.0;
-  beamLight.intensity = (520 + pulse * 980) * sectionBoost;
-  rim.intensity = (360 + Math.sin(t * 2.3) * 110 + pulse * 320) * sectionBoost;
-  key.intensity = 1.0 + Math.sin(t * 1.25) * 0.3 + level * 0.4 + (section === 2 ? 0.35 : 0);
-  moon.intensity = 0.7 + Math.sin(t * 0.4) * 0.15 + level * 0.25;
-  beamLight.distance = 62 + level * 6;
-
-  moonVisual.position.set(
-    moonBase.x + Math.sin(t * 0.08) * 1.3,
-    moonBase.y + Math.sin(t * 0.06) * 0.5,
-    moonBase.z + Math.cos(t * 0.07) * 1.2,
-  );
-  moon.position.copy(moonVisual.position).normalize().multiplyScalar(28);
-  moonDir.copy(moon.position).normalize();
-  moonVisual.lookAt(camera.position);
-  moonHalo.material.uniforms.uPulse.value = 0.2 + level * 0.35 + beat * 0.55;
-
-  moonReflection.position.x = THREE.MathUtils.clamp(moonVisual.position.x * 0.5, -18.0, -12.0);
-  moonReflection.position.z = shorelineZ - 20.0 + Math.max(-5, moonVisual.position.z + 36.0) * 0.12;
-  moonReflection.scale.x = 0.9 + Math.abs(moonDir.x) * 0.7;
-  moonReflection.material.uniforms.uTime.value = t;
-  moonReflection.material.uniforms.uBeat.value = Math.min(1.0, level * 0.7 + beat * 0.8);
-  moonReflection.material.uniforms.uStrength.value = 1.55 + moon.intensity * 0.42;
-
-  moonReflectionWide.position.x = moonReflection.position.x + 1.1;
-  moonReflectionWide.position.z = moonReflection.position.z - 5.2;
-  moonReflectionWide.material.uniforms.uTime.value = t * 0.85 + 4.0;
-  moonReflectionWide.material.uniforms.uBeat.value = Math.min(1.0, level * 0.55 + beat * 0.6);
-  moonReflectionWide.material.uniforms.uStrength.value = 1.0 + moon.intensity * 0.28;
-
-  beaconBeam.rotation.z = Math.sin(t * 1.5) * 0.16 + beat * 0.06;
-  beaconBeam.material.opacity = 0.11 + (Math.sin(t * 3.6) * 0.5 + 0.5) * 0.13 + level * 0.18;
-  displaceWaterGeometry(oceanGeometry, oceanBasePos, t * 0.9, 1.15 + level * 0.3 + beat * 0.45);
-  displaceWaterGeometry(farOceanGeometry, farOceanBasePos, t * 0.72 + 5.0, 0.95 + level * 0.2);
-
-  ocean.material.uniforms.time.value = t * 0.48;
-  ocean.material.uniforms.sunDirection.value.copy(key.position).normalize();
-  ocean.material.uniforms.distortionScale.value = 3.2 + level * 1.5 + beat * 2.1;
-  ocean.position.x = Math.sin(t * 0.05) * 2.0;
-  ocean.rotation.z = Math.sin(t * 0.04) * 0.004;
-  farOcean.material.uniforms.time.value = t * 0.36 + 12.0;
-  farOcean.material.uniforms.sunDirection.value.copy(key.position).normalize();
-  farOcean.material.uniforms.distortionScale.value = 4.4 + level * 1.2;
-
-  stars.rotation.y = t * 0.01;
-  sky.rotation.y = -t * 0.006;
-
-  strobeRig.rotation.y = t * 0.09;
-  for (let i = 0; i < strobeSpots.length; i += 1) {
-    const spot = strobeSpots[i];
-    const target = strobeTargets[i];
-    const cone = strobeCones[i];
-    const phase = t * (8.5 + i * 0.75) + i * 1.13;
-    const hardStrobe = Math.pow(Math.max(0, Math.sin(phase)), section === 3 ? 7.5 : 5.8);
-    const beatAmp = 1.0 + beat * 2.2;
-    const base = 60;
-    const peak = (section === 3 ? 4400 : 2800) * beatAmp;
-    spot.intensity = base + hardStrobe * peak;
-    spot.angle = 0.16 + (Math.sin(t * 0.7 + i) * 0.5 + 0.5) * 0.14;
-
-    target.position.set(
-      Math.sin(t * 0.48 + i * 1.4) * 1.8,
-      1.3 + Math.sin(t * 0.7 + i * 0.8) * 0.55,
-      Math.cos(t * 0.52 + i * 1.1) * 1.5,
-    );
-
-    cone.position.copy(spot.position);
-    tmpDir.copy(target.position).sub(spot.position).normalize();
-    cone.quaternion.setFromUnitVectors(upAxis, tmpDir);
-    cone.material.opacity = 0.008 + hardStrobe * (0.045 + level * 0.06);
-    cone.scale.set(1, 1 + level * 0.12, 1);
-  }
-
-  ringGroup.children.forEach((ring, i) => {
-    ring.rotation.z = t * (0.2 + i * 0.08) * (i % 2 === 0 ? 1 : -1);
-    ring.material.opacity = 0.18 + (Math.sin(t * 1.9 + i * 1.2) * 0.5 + 0.5) * 0.2 + level * 0.18;
-    ring.scale.setScalar(1 + beat * (0.08 + i * 0.03));
-  });
-
-  for (let i = 0; i < cityCount; i += 1) {
-    const c = cityData[i];
-    const hue = 0.56 + Math.sin(t * 0.6 + c.phase) * 0.04;
-    const lit = 0.35 + (Math.sin(t * 1.8 * c.amp + c.phase) * 0.5 + 0.5) * 0.4 + level * 0.3;
-    tmpColor.setHSL(hue, 0.72, lit);
-    city.setColorAt(i, tmpColor);
-  }
-  city.instanceColor.needsUpdate = true;
-
-  for (let i = 0; i < bloomPieces.length; i += 1) {
-    const mat = bloomPieces[i];
-    if (mat && "emissiveIntensity" in mat) {
-      mat.emissiveIntensity = 0.15 + (Math.sin(t * 2.5 + i * 0.7) * 0.5 + 0.5) * 0.55 + level * 0.35;
-    }
-  }
-
-  ground.material.uniforms.uTime.value = t;
-  ground.material.uniforms.uBeat.value = Math.min(1.0, level * 0.8 + beat * 1.2);
-  shoreline.material.uniforms.uTime.value = t;
-  shoreline.material.uniforms.uBeat.value = Math.min(1.0, level * 0.8 + beat * 1.2);
-
-  bloomPass.strength =
-    (section === 3 ? 0.78 : 0.48) + level * (section === 1 ? 0.34 : 0.24) + beat * 0.22;
-  bloomPass.radius = 0.28 + level * (section === 2 ? 0.18 : 0.12);
-  bloomPass.threshold = (section === 3 ? 0.84 : 0.88) - level * 0.03;
-
-  crtPass.uniforms.uTime.value = t;
-  crtPass.uniforms.uBeat.value = Math.min(1.0, beat * 1.2 + level * 0.6);
-  crtPass.uniforms.uGlitch.value = Math.min(
-    1.0,
-    (section === 3 ? 0.65 : section === 1 ? 0.35 : 0.15) + beat * 0.7,
-  );
-
-  if (debugView) {
-    renderer.render(scene, camera);
-  } else {
-    composer.render();
+    clocktowerControllerCtx.usingBlenderTower = usingBlenderTower;
+    clocktowerControllerCtx.usingBlenderCity = usingBlenderCity;
+    clocktowerControllerCtx.blenderMinuteHand = blenderMinuteHand;
+    clocktowerControllerCtx.blenderHourHand = blenderHourHand;
+    sceneDebug = updateClocktowerScene(clocktowerControllerCtx, {
+      t,
+      beat,
+      level,
+      section,
+      cinematicMix,
+    });
   }
 
   window.__demoState.frames += 1;
@@ -1941,11 +1801,11 @@ function tick() {
     level: Number(level.toFixed(3)),
     beat: Number(beat.toFixed(3)),
     section,
-    oceanTime: Number(ocean.material.uniforms.time.value.toFixed(2)),
     cinematicMix: Number(cinematicMix.toFixed(3)),
     blenderTower: usingBlenderTower,
     blenderCity: usingBlenderCity,
     debugView,
+    ...sceneDebug,
   };
 
   requestAnimationFrame(tick);
