@@ -160,7 +160,7 @@ export function createOrbitSchematic({ root = document } = {}) {
     ctx.fillStyle = viewerLightDot > 0 ? "rgba(255, 238, 130, 0.95)" : "rgba(142, 188, 255, 0.95)";
     ctx.fillText(viewerLightDot > 0 ? "viewer: day" : "viewer: night", 10, 31);
     ctx.fillStyle = "rgba(185, 225, 255, 0.85)";
-    ctx.fillText("spin", 12, h - 20);
+    ctx.fillText("site", 12, h - 20);
     ctx.fillStyle = "rgba(255, 186, 92, 0.9)";
     ctx.fillText("sun", 44, h - 20);
     ctx.fillStyle = "rgba(255, 244, 110, 0.95)";

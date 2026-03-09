@@ -34,6 +34,8 @@ export function computeBinarySimulationState({
   planetOrbitRadius,
   cameraPosition,
   cameraTarget,
+  observerLatitude = 0,
+  observerLongitude = 0,
 }) {
   const dayPhase = THREE.MathUtils.euclideanModulo(binaryDayHours, 24) / 24;
   const dayAngle = dayPhase * Math.PI * 2;
@@ -60,11 +62,18 @@ export function computeBinarySimulationState({
 
   const spinYaw = dayAngle; // Exactly one rotation per day.
   const viewerTurnYaw = extractViewerTurnYaw(cameraPosition, cameraTarget);
-  const viewerYaw = spinYaw + viewerTurnYaw;
+  const observerYaw = spinYaw + observerLongitude;
+  const cosLat = Math.cos(observerLatitude);
+  const observerNormal = new THREE.Vector3(
+    Math.sin(observerYaw) * cosLat,
+    Math.sin(observerLatitude),
+    -Math.cos(observerYaw) * cosLat,
+  ).normalize();
+  const spinDir = new THREE.Vector2(observerNormal.x, observerNormal.z).normalize();
 
-  const surfaceNormal = new THREE.Vector3(Math.sin(viewerYaw), 0, -Math.cos(viewerYaw)).normalize();
-  const spinDir = new THREE.Vector2(Math.sin(spinYaw), -Math.cos(spinYaw));
-  const viewerDir = new THREE.Vector2(surfaceNormal.x, surfaceNormal.z);
+  // Viewer turning changes heading only; it does not move observer location.
+  const viewerYaw = observerYaw + viewerTurnYaw;
+  const viewerDir = new THREE.Vector2(Math.sin(viewerYaw), -Math.cos(viewerYaw)).normalize();
 
   const toA = new THREE.Vector3().subVectors(starAPosition, planetPosition).normalize();
   const toB = new THREE.Vector3().subVectors(starBPosition, planetPosition).normalize();
@@ -77,8 +86,8 @@ export function computeBinarySimulationState({
   const combinedStarWorld = toA.clone().multiplyScalar(weightA).add(toB.clone().multiplyScalar(weightB)).normalize();
   const combinedStarDir = new THREE.Vector2(combinedStarWorld.x, combinedStarWorld.z);
 
-  const incidenceA = Math.max(0, toA.dot(surfaceNormal));
-  const incidenceB = Math.max(0, toB.dot(surfaceNormal));
+  const incidenceA = Math.max(0, toA.dot(observerNormal));
+  const incidenceB = Math.max(0, toB.dot(observerNormal));
   const lightA = incidenceA * weightA;
   const lightB = incidenceB * weightB;
   const lightTotal = lightA + lightB;
@@ -87,18 +96,18 @@ export function computeBinarySimulationState({
   const dayStrength = THREE.MathUtils.clamp(lightA * 620, 0, 1);
   const secondStrength = THREE.MathUtils.clamp(lightB * 780, 0, 1);
 
-  const maxIncidence = Math.max(toA.dot(surfaceNormal), toB.dot(surfaceNormal));
+  const maxIncidence = Math.max(toA.dot(observerNormal), toB.dot(observerNormal));
   const twilight = smoothstep(-0.16, 0.07, maxIncidence) * (1 - smoothstep(0.17, 0.42, maxIncidence));
 
-  const localFrame = buildLocalFrame(surfaceNormal);
-  const primaryDir = toViewerLocal(toA, localFrame, surfaceNormal);
-  const secondaryDir = toViewerLocal(toB, localFrame, surfaceNormal);
-  const viewerLightDot = surfaceNormal.dot(combinedStarWorld);
+  const primaryDir = toA;
+  const secondaryDir = toB;
+  const viewerLightDot = observerNormal.dot(combinedStarWorld);
 
   return {
     dayPhase,
     spinYaw,
     viewerTurnYaw,
+    observerYaw,
     viewerYaw,
     starAPosition,
     starBPosition,
