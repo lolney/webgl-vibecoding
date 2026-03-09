@@ -92,20 +92,20 @@ export function updateBinaryScene(ctx, frame) {
     renderer.toneMappingExposure = THREE.MathUtils.lerp(0.46, 0.9, daylight) + secondStrength * 0.06;
     stars.material.opacity = THREE.MathUtils.lerp(0.92, 0.08, daylight);
   } else if (isExternalScene) {
-    ambient.intensity = 0.045;
-    ambient.color.setRGB(0.1, 0.12, 0.2);
+    ambient.intensity = 0.0;
+    ambient.color.setRGB(0.0, 0.0, 0.0);
     scene.background.setHex(0x02030f);
     scene.fog.color.setHex(0x02030f);
-    scene.fog.density = 0.024;
-    renderer.toneMappingExposure = 0.82;
+    scene.fog.density = 0.019;
+    renderer.toneMappingExposure = 0.86;
     stars.material.opacity = 0.95;
   }
 
   if (isExternalScene) {
-    binaryStarALight.intensity = 9800;
-    binaryStarBLight.intensity = 7600;
-    binaryFill.intensity = 0.015;
-    planetAtmosphere.material.uniforms.uIntensity.value = 0.38;
+    binaryStarALight.intensity = 8600;
+    binaryStarBLight.intensity = 6400;
+    binaryFill.intensity = 0.0;
+    planetAtmosphere.material.uniforms.uIntensity.value = 0.22;
   } else {
     binaryStarALight.intensity = 2200 + dayStrength * 6200;
     binaryStarBLight.intensity = 260 + secondStrength * 4200;

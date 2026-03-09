@@ -268,42 +268,116 @@ function makeOrbitLine(radius, color = 0x6caeff) {
   return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), orbitLineMat.clone().setValues({ color }));
 }
 
-const starAGroup = new THREE.Group();
-const starAMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(2.6, 36, 28),
-  new THREE.MeshBasicMaterial({ color: 0xfff4c2, toneMapped: false }),
-);
-const starAHalo = new THREE.Mesh(
-  new THREE.SphereGeometry(3.35, 24, 20),
-  new THREE.MeshBasicMaterial({
-    color: 0xffd57a,
+function makeVolumetricStar({ radius, coreColor, glowColor, shellColor }) {
+  const group = new THREE.Group();
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 48, 36),
+    new THREE.ShaderMaterial({
+      uniforms: {
+        uCore: { value: new THREE.Color(coreColor) },
+        uGlow: { value: new THREE.Color(glowColor) },
+      },
+      vertexShader: `
+        varying vec3 vNormalW;
+        varying vec3 vViewDirW;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vNormalW = normalize(mat3(modelMatrix) * normal);
+          vViewDirW = normalize(cameraPosition - worldPos.xyz);
+          gl_Position = projectionMatrix * viewMatrix * worldPos;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uCore;
+        uniform vec3 uGlow;
+        varying vec3 vNormalW;
+        varying vec3 vViewDirW;
+        void main() {
+          float ndv = clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0);
+          float center = pow(ndv, 0.35);
+          float limb = pow(1.0 - ndv, 1.9);
+          vec3 col = mix(uGlow, uCore, center);
+          col += uGlow * limb * 0.75;
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+      toneMapped: false,
+    }),
+  );
+  group.add(core);
+
+  const shellMat = new THREE.ShaderMaterial({
     transparent: true,
-    opacity: 0.27,
-    blending: THREE.AdditiveBlending,
     depthWrite: false,
-  }),
-);
-starAGroup.add(starAMesh);
-starAGroup.add(starAHalo);
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    uniforms: {
+      uColor: { value: new THREE.Color(shellColor) },
+      uPower: { value: 2.2 },
+      uAlpha: { value: 0.38 },
+    },
+    vertexShader: `
+      varying vec3 vNormalW;
+      varying vec3 vViewDirW;
+      void main() {
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vNormalW = normalize(mat3(modelMatrix) * normal);
+        vViewDirW = normalize(cameraPosition - worldPos.xyz);
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uPower;
+      uniform float uAlpha;
+      varying vec3 vNormalW;
+      varying vec3 vViewDirW;
+      void main() {
+        float ndv = clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0);
+        float rim = pow(1.0 - ndv, uPower);
+        gl_FragColor = vec4(uColor * rim, rim * uAlpha);
+      }
+    `,
+    toneMapped: false,
+  });
+
+  const innerShell = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 1.45, 36, 28),
+    shellMat.clone(),
+  );
+  innerShell.material.uniforms.uPower.value = 1.9;
+  innerShell.material.uniforms.uAlpha.value = 0.34;
+  group.add(innerShell);
+
+  const outerShell = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 2.05, 28, 22),
+    shellMat.clone(),
+  );
+  outerShell.material.uniforms.uPower.value = 2.7;
+  outerShell.material.uniforms.uAlpha.value = 0.18;
+  group.add(outerShell);
+
+  return { group, core, innerShell, outerShell };
+}
+
+const starAGroup = new THREE.Group();
+const starAVisual = makeVolumetricStar({
+  radius: 1.3,
+  coreColor: 0xfff3cc,
+  glowColor: 0xffd468,
+  shellColor: 0xffb34d,
+});
+starAGroup.add(starAVisual.group);
 binarySystemGroup.add(starAGroup);
 
 const starBGroup = new THREE.Group();
-const starBMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(2.1, 32, 24),
-  new THREE.MeshBasicMaterial({ color: 0xbfd4ff, toneMapped: false }),
-);
-const starBHalo = new THREE.Mesh(
-  new THREE.SphereGeometry(2.95, 20, 16),
-  new THREE.MeshBasicMaterial({
-    color: 0x7ca7ff,
-    transparent: true,
-    opacity: 0.24,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  }),
-);
-starBGroup.add(starBMesh);
-starBGroup.add(starBHalo);
+const starBVisual = makeVolumetricStar({
+  radius: 1.05,
+  coreColor: 0xd9e6ff,
+  glowColor: 0x95b6ff,
+  shellColor: 0x6f9eff,
+});
+starBGroup.add(starBVisual.group);
 binarySystemGroup.add(starBGroup);
 
 const binaryStarALight = new THREE.PointLight(0xfff4c2, 6500, 220, 2.0);
@@ -318,31 +392,33 @@ binarySystemGroup.add(planetPivot);
 planetPivot.add(planetGroup);
 
 const planetMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(1.3, 64, 48),
+  new THREE.SphereGeometry(0.65, 64, 48),
   new THREE.MeshPhysicalMaterial({
     color: 0x315f8a,
     roughness: 1.0,
     metalness: 0.0,
     clearcoat: 0.02,
     clearcoatRoughness: 0.92,
+    envMapIntensity: 0.0,
   }),
 );
 planetGroup.add(planetMesh);
 
 const cloudLayer = new THREE.Mesh(
-  new THREE.SphereGeometry(1.39, 40, 32),
+  new THREE.SphereGeometry(0.7, 40, 32),
   new THREE.MeshPhysicalMaterial({
     color: 0xbcd6ff,
     transparent: true,
     opacity: 0.13,
     roughness: 0.8,
     metalness: 0.02,
+    envMapIntensity: 0.0,
   }),
 );
 planetGroup.add(cloudLayer);
 
 const planetAtmosphere = new THREE.Mesh(
-  new THREE.SphereGeometry(1.45, 48, 36),
+  new THREE.SphereGeometry(0.74, 48, 36),
   new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -379,7 +455,7 @@ const planetAtmosphere = new THREE.Mesh(
 planetGroup.add(planetAtmosphere);
 
 const planetRing = new THREE.Mesh(
-  new THREE.RingGeometry(1.55, 1.98, 80),
+  new THREE.RingGeometry(0.78, 0.99, 80),
   new THREE.MeshBasicMaterial({
     color: 0x89ccff,
     transparent: true,
