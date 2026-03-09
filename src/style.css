@@ -64,6 +64,13 @@ body {
   box-shadow: 0 0 18px #ff5cf566;
 }
 
+#timeRateButton {
+  border-color: #f3e66c;
+  color: #fff7ba;
+  background: linear-gradient(180deg, #5c4f13, #2e270c);
+  box-shadow: 0 0 14px #f7dc5677;
+}
+
 .hud select {
   pointer-events: auto;
   border: 1px solid #7fbeff;

@@ -23,7 +23,12 @@ const canvas = document.getElementById("gl");
 const audioButton = document.getElementById("audioToggle");
 const hud = createHudPrimitive();
 const orbitSchematic = createOrbitSchematic();
-const { sceneChooser, modeBadge, timeIndicator } = hud.elements;
+const {
+  sceneChooser,
+  modeBadge,
+  timeIndicator,
+  timeRateButton,
+} = hud.elements;
 const query = new URLSearchParams(window.location.search);
 const debugView = query.get("debug") === "1";
 const initialSceneQuery = query.get("scene");
@@ -1319,8 +1324,14 @@ const sceneLabels = Object.fromEntries(sceneDefinitions.map((sceneDef) => [scene
 hud.setSceneOptions(sceneDefinitions);
 hud.setTitle("NEON CLOCKTOWER // DEMOSCENE CUT");
 let binaryDayHours = binaryHourQuery !== null ? THREE.MathUtils.euclideanModulo(binaryHourQuery, 24) : 13.2;
-const binaryHourRate = binaryHourRateQuery !== null ? binaryHourRateQuery : 0.12;
+const binaryHourRateBase = binaryHourRateQuery !== null ? binaryHourRateQuery : 0.12;
+let binaryTimeMultiplier = 1;
 let lastTickTime = 0;
+
+function updateTimeRateLabel() {
+  if (!timeRateButton) return;
+  timeRateButton.textContent = `${binaryTimeMultiplier}x`;
+}
 
 function format24Hour(hoursValue) {
   const h = THREE.MathUtils.euclideanModulo(hoursValue, 24);
@@ -1395,6 +1406,9 @@ function applySceneMode(nextSceneKey, options = {}) {
   orbitSchematic.setVisible(activeSceneKey === "binarySurface");
   if (timeIndicator) {
     timeIndicator.style.display = activeSceneKey === "clocktower" ? "none" : "inline-block";
+  }
+  if (timeRateButton) {
+    timeRateButton.style.display = activeSceneKey === "binarySurface" ? "inline-block" : "none";
   }
 }
 
@@ -1664,6 +1678,14 @@ modeBadge.addEventListener("click", () => {
   setCinematic(!cinematic);
   markInteraction();
 });
+if (timeRateButton) {
+  updateTimeRateLabel();
+  timeRateButton.addEventListener("click", () => {
+    binaryTimeMultiplier = (binaryTimeMultiplier % 5) + 1;
+    updateTimeRateLabel();
+    markInteraction();
+  });
+}
 if (sceneChooser) {
   sceneChooser.addEventListener("change", (e) => {
     applySceneMode(e.target.value, { pushHistory: true });
@@ -1681,6 +1703,12 @@ window.__setBinaryTime = (hours) => {
   if (Number.isFinite(hours)) binaryDayHours = THREE.MathUtils.euclideanModulo(hours, 24);
 };
 window.__getBinaryTime = () => binaryDayHours;
+window.__setTimeMultiplier = (mult) => {
+  if (!Number.isFinite(mult)) return;
+  binaryTimeMultiplier = THREE.MathUtils.clamp(Math.round(mult), 1, 5);
+  updateTimeRateLabel();
+};
+window.__getTimeMultiplier = () => binaryTimeMultiplier;
 window.__setScene = (sceneKey) => {
   applySceneMode(sceneByKey[sceneKey] ? sceneKey : "clocktower");
 };
@@ -1852,7 +1880,10 @@ function tick() {
   controls.update();
   const shouldCinematicBlend = cinematic;
   cinematicMix = THREE.MathUtils.lerp(cinematicMix, shouldCinematicBlend ? 1 : 0, 0.02);
-  binaryDayHours = THREE.MathUtils.euclideanModulo(binaryDayHours + dt * binaryHourRate, 24);
+  binaryDayHours = THREE.MathUtils.euclideanModulo(
+    binaryDayHours + dt * binaryHourRateBase * binaryTimeMultiplier,
+    24,
+  );
 
   let sceneDebug = {};
   if (activeSceneKey !== "clocktower") {
@@ -1895,6 +1926,7 @@ function tick() {
     blenderTower: usingBlenderTower,
     blenderCity: usingBlenderCity,
     debugView,
+    timeMultiplier: binaryTimeMultiplier,
     cameraPos: [Number(camera.position.x.toFixed(3)), Number(camera.position.y.toFixed(3)), Number(camera.position.z.toFixed(3))],
     cameraTarget: [Number(controls.target.x.toFixed(3)), Number(controls.target.y.toFixed(3)), Number(controls.target.z.toFixed(3))],
     ...sceneDebug,

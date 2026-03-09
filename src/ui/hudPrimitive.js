@@ -2,6 +2,7 @@ export function createHudPrimitive({ root = document } = {}) {
   const sceneChooser = root.getElementById("sceneChooser");
   const modeBadge = root.getElementById("modeBadge");
   const timeIndicator = root.getElementById("timeIndicator");
+  const timeRateButton = root.getElementById("timeRateButton");
   const title = root.querySelector(".hud h1");
 
   function setSceneOptions(sceneDefs) {
@@ -16,7 +17,7 @@ export function createHudPrimitive({ root = document } = {}) {
   }
 
   return {
-    elements: { sceneChooser, modeBadge, timeIndicator, title },
+    elements: { sceneChooser, modeBadge, timeIndicator, timeRateButton, title },
     setSceneOptions,
     setScene(sceneKey) {
       if (sceneChooser) sceneChooser.value = sceneKey;
@@ -26,6 +27,9 @@ export function createHudPrimitive({ root = document } = {}) {
     },
     setTimeText(text) {
       if (timeIndicator) timeIndicator.textContent = text;
+    },
+    setTimeRateText(text) {
+      if (timeRateButton) timeRateButton.textContent = text;
     },
     setTitle(text) {
       if (title && text) title.textContent = text;
