@@ -138,10 +138,16 @@ export function updateBinaryScene(ctx, frame) {
     controls.target.lerp(new THREE.Vector3(0, 0, 0), cinematicMix * 0.06);
   } else {
     if (cinematicMix > 0.001) {
-      const surfCam = new THREE.Vector3(Math.sin(t * 0.055) * 6.0, 1.7 + Math.sin(t * 0.07) * 0.08, 12.5);
-      const surfTarget = new THREE.Vector3(Math.sin(t * 0.04) * 8.0, 1.2, -86);
-      camera.position.lerp(surfCam, cinematicMix * 0.045);
-      controls.target.lerp(surfTarget, cinematicMix * 0.05);
+      const followDir = primaryDir
+        .clone()
+        .multiplyScalar(Math.max(0.05, dayStrength))
+        .add(secondaryDir.clone().multiplyScalar(Math.max(0.0, secondStrength * 1.1)))
+        .normalize();
+      const targetDist = 120;
+      const sunTrackTarget = camera.position.clone().add(followDir.multiplyScalar(targetDist));
+      sunTrackTarget.y = camera.position.y + THREE.MathUtils.clamp(followDir.y, -0.15, 0.72) * 64;
+      controls.target.lerp(sunTrackTarget, cinematicMix * 0.12);
+      camera.lookAt(controls.target);
     }
     if (camera.position.y < 1.0) camera.position.y = 1.0;
     camera.up.set(0, 1, 0);

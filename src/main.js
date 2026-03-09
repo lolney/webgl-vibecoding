@@ -1393,6 +1393,9 @@ function applySceneMode(nextSceneKey, options = {}) {
     setCinematic,
   });
   orbitSchematic.setVisible(activeSceneKey === "binarySurface");
+  if (timeIndicator) {
+    timeIndicator.style.display = activeSceneKey === "clocktower" ? "none" : "inline-block";
+  }
 }
 
 function createSynth() {
@@ -1620,10 +1623,16 @@ const sectionNames = ["Pulse Forge", "Hyper Lift", "Night Glide", "Strobe Core"]
 
 function setCinematic(on) {
   cinematic = on;
+  if (activeSceneKey === "binarySurface") {
+    modeBadge.textContent = on ? "Sun-Track Camera // Planet POV" : "Manual Horizon Camera // Planet POV";
+    return;
+  }
+  if (activeSceneKey === "binaryExternal") {
+    modeBadge.textContent = on ? "Cinematic Orbit Camera // Binary External" : "Manual Orbit Camera // Binary External";
+    return;
+  }
   const camText = on ? "Cinematic Camera" : "Manual Camera";
-  const sectionText = activeSceneKey === "clocktower"
-    ? (currentSection >= 0 ? sectionNames[currentSection] : "Boot")
-    : sceneLabels[activeSceneKey];
+  const sectionText = currentSection >= 0 ? sectionNames[currentSection] : "Boot";
   modeBadge.textContent = `${camText} // ${sectionText}`;
 }
 
