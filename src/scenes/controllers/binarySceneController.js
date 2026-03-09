@@ -92,20 +92,20 @@ export function updateBinaryScene(ctx, frame) {
     renderer.toneMappingExposure = THREE.MathUtils.lerp(0.46, 0.9, daylight) + secondStrength * 0.06;
     stars.material.opacity = THREE.MathUtils.lerp(0.92, 0.08, daylight);
   } else if (isExternalScene) {
-    ambient.intensity = 0.58;
-    ambient.color.setRGB(0.44, 0.52, 0.88);
+    ambient.intensity = 0.045;
+    ambient.color.setRGB(0.1, 0.12, 0.2);
     scene.background.setHex(0x02030f);
     scene.fog.color.setHex(0x02030f);
-    scene.fog.density = 0.032;
-    renderer.toneMappingExposure = 0.74;
+    scene.fog.density = 0.024;
+    renderer.toneMappingExposure = 0.82;
     stars.material.opacity = 0.95;
   }
 
   if (isExternalScene) {
-    binaryStarALight.intensity = 6200;
-    binaryStarBLight.intensity = 4200;
-    binaryFill.intensity = 0.3;
-    planetAtmosphere.material.uniforms.uIntensity.value = 0.5;
+    binaryStarALight.intensity = 9800;
+    binaryStarBLight.intensity = 7600;
+    binaryFill.intensity = 0.015;
+    planetAtmosphere.material.uniforms.uIntensity.value = 0.38;
   } else {
     binaryStarALight.intensity = 2200 + dayStrength * 6200;
     binaryStarBLight.intensity = 260 + secondStrength * 4200;
@@ -191,6 +191,10 @@ export function updateBinaryScene(ctx, frame) {
     bloomPass.strength = 0.18 + secondStrength * 0.14 + beat * 0.06;
     bloomPass.radius = 0.14 + secondStrength * 0.08;
     bloomPass.threshold = 0.9;
+  } else if (isExternalScene) {
+    bloomPass.strength = 0.24 + beat * 0.05;
+    bloomPass.radius = 0.14;
+    bloomPass.threshold = 0.93;
   } else {
     bloomPass.strength = 0.32 + beat * 0.08;
     bloomPass.radius = 0.18;
