@@ -254,7 +254,7 @@ scene.add(stars);
 
 const binarySystemGroup = new THREE.Group();
 binarySystemGroup.visible = false;
-binarySystemGroup.scale.setScalar(0.65);
+binarySystemGroup.scale.setScalar(0.6);
 scene.add(binarySystemGroup);
 
 const orbitLineMat = new THREE.LineBasicMaterial({ color: 0x6caeff, transparent: true, opacity: 0.35 });
@@ -270,15 +270,15 @@ function makeOrbitLine(radius, color = 0x6caeff) {
 
 const starAGroup = new THREE.Group();
 const starAMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(3.2, 36, 28),
+  new THREE.SphereGeometry(2.6, 36, 28),
   new THREE.MeshBasicMaterial({ color: 0xfff4c2, toneMapped: false }),
 );
 const starAHalo = new THREE.Mesh(
-  new THREE.SphereGeometry(4.9, 24, 20),
+  new THREE.SphereGeometry(3.35, 24, 20),
   new THREE.MeshBasicMaterial({
     color: 0xffd57a,
     transparent: true,
-    opacity: 0.44,
+    opacity: 0.27,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   }),
@@ -289,15 +289,15 @@ binarySystemGroup.add(starAGroup);
 
 const starBGroup = new THREE.Group();
 const starBMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(2.5, 32, 24),
+  new THREE.SphereGeometry(2.1, 32, 24),
   new THREE.MeshBasicMaterial({ color: 0xbfd4ff, toneMapped: false }),
 );
 const starBHalo = new THREE.Mesh(
-  new THREE.SphereGeometry(3.9, 20, 16),
+  new THREE.SphereGeometry(2.95, 20, 16),
   new THREE.MeshBasicMaterial({
     color: 0x7ca7ff,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.24,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   }),
@@ -311,14 +311,14 @@ const binaryStarBLight = new THREE.PointLight(0xbfd4ff, 4800, 210, 2.0);
 scene.add(binaryStarALight);
 scene.add(binaryStarBLight);
 
-const planetOrbitRadius = 16.5;
+const planetOrbitRadius = 19.2;
 const planetGroup = new THREE.Group();
 const planetPivot = new THREE.Group();
 binarySystemGroup.add(planetPivot);
 planetPivot.add(planetGroup);
 
 const planetMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(1.55, 64, 48),
+  new THREE.SphereGeometry(1.3, 64, 48),
   new THREE.MeshPhysicalMaterial({
     color: 0x315f8a,
     roughness: 1.0,
@@ -330,7 +330,7 @@ const planetMesh = new THREE.Mesh(
 planetGroup.add(planetMesh);
 
 const cloudLayer = new THREE.Mesh(
-  new THREE.SphereGeometry(1.64, 40, 32),
+  new THREE.SphereGeometry(1.39, 40, 32),
   new THREE.MeshPhysicalMaterial({
     color: 0xbcd6ff,
     transparent: true,
@@ -342,7 +342,7 @@ const cloudLayer = new THREE.Mesh(
 planetGroup.add(cloudLayer);
 
 const planetAtmosphere = new THREE.Mesh(
-  new THREE.SphereGeometry(1.72, 48, 36),
+  new THREE.SphereGeometry(1.45, 48, 36),
   new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
@@ -379,7 +379,7 @@ const planetAtmosphere = new THREE.Mesh(
 planetGroup.add(planetAtmosphere);
 
 const planetRing = new THREE.Mesh(
-  new THREE.RingGeometry(1.95, 2.45, 80),
+  new THREE.RingGeometry(1.55, 1.98, 80),
   new THREE.MeshBasicMaterial({
     color: 0x89ccff,
     transparent: true,
@@ -458,13 +458,13 @@ const surfaceSky = new THREE.Mesh(
         base += vec3(1.0, 0.42, 0.22) * horizonBand * uTwilight * 0.35;
         float dA = dot(dir, normalize(uA));
         float dB = dot(dir, normalize(uB));
-        float glowA = pow(max(dA, 0.0), 10.5);
-        float glowB = pow(max(dB, 0.0), 10.8) * uSecond;
-        float sunA = smoothstep(0.9972, 0.9992, dA);
-        float sunB = smoothstep(0.9974, 0.99925, dB) * uSecond;
-        vec3 col = base + vec3(1.0, 0.72, 0.36) * glowA * 0.58 + vec3(0.6, 0.78, 1.0) * glowB * 0.82;
-        col += vec3(1.0, 0.93, 0.78) * sunA * 1.7;
-        col += vec3(0.72, 0.86, 1.0) * sunB * 1.55;
+        float glowA = pow(max(dA, 0.0), 16.0);
+        float glowB = pow(max(dB, 0.0), 16.4) * uSecond;
+        float sunA = smoothstep(0.99905, 0.99965, dA);
+        float sunB = smoothstep(0.9991, 0.9997, dB) * uSecond;
+        vec3 col = base + vec3(1.0, 0.72, 0.36) * glowA * 0.5 + vec3(0.6, 0.78, 1.0) * glowB * 0.7;
+        col += vec3(1.0, 0.93, 0.78) * sunA * 1.35;
+        col += vec3(0.72, 0.86, 1.0) * sunB * 1.25;
         gl_FragColor = vec4(col, 1.0);
       }
     `,

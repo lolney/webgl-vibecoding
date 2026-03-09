@@ -83,3 +83,4 @@ Useful flags:
 - `--target-x`, `--target-y`, `--target-z`
 - `--wait-ms=<milliseconds>`
 - `--debug` (disables post-processing)
+- `--sweep-azimuth=0,90,180,270` (takes multiple angle shots in one run; values can be degrees or radians)

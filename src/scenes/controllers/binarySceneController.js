@@ -104,8 +104,8 @@ export function updateBinaryScene(ctx, frame) {
   if (isExternalScene) {
     binaryStarALight.intensity = 6200;
     binaryStarBLight.intensity = 4200;
-    binaryFill.intensity = 0.38;
-    planetAtmosphere.material.uniforms.uIntensity.value = 0.62;
+    binaryFill.intensity = 0.3;
+    planetAtmosphere.material.uniforms.uIntensity.value = 0.5;
   } else {
     binaryStarALight.intensity = 2200 + dayStrength * 6200;
     binaryStarBLight.intensity = 260 + secondStrength * 4200;
@@ -117,7 +117,7 @@ export function updateBinaryScene(ctx, frame) {
     if (isExternalScene) {
       timeIndicator.textContent = "System View";
     } else {
-      const phaseText = secondStrength > 0.06 ? "2nd Sun" : dayStrength > 0.05 ? "Day" : "Night";
+      const phaseText = secondStrength > 0.06 ? "2nd Sun" : daylight > 0.28 ? "Day" : "Night";
       timeIndicator.textContent = `Time ${format24Hour(binaryDayHours)} ${phaseText}`;
     }
   }

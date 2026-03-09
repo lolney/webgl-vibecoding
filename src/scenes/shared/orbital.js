@@ -16,14 +16,14 @@ function dirFromAzAlt(azimuth, altitude) {
 export function computeBinaryOrbitState({ t, binaryDayHours, planetOrbitRadius }) {
   const sysT = t * 0.24;
   const starAPosition = new THREE.Vector3(
-    Math.cos(sysT) * 2.2,
-    Math.sin(sysT * 0.35) * 0.35,
-    Math.sin(sysT) * 2.2,
+    Math.cos(sysT) * 4.8,
+    Math.sin(sysT * 0.35) * 0.22,
+    Math.sin(sysT) * 4.8,
   );
   const starBPosition = new THREE.Vector3(
-    -Math.cos(sysT * 1.03) * 2.9,
-    Math.cos(sysT * 0.42) * 0.45,
-    -Math.sin(sysT * 1.03) * 2.9,
+    -Math.cos(sysT * 1.03) * 5.6,
+    Math.cos(sysT * 0.42) * 0.26,
+    -Math.sin(sysT * 1.03) * 5.6,
   );
 
   const planetOrbitA = sysT * 0.38;

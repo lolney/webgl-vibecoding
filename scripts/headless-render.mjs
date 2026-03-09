@@ -29,8 +29,15 @@ const distance = readNumberArg("distance");
 const targetX = readNumberArg("target-x");
 const targetY = readNumberArg("target-y");
 const targetZ = readNumberArg("target-z");
+const sweepAzimuthRaw = getArg("sweep-azimuth");
 const waitMs = Math.max(100, readNumberArg("wait-ms") ?? 1800);
 const outputName = getArg("name");
+const sweepAzimuth = sweepAzimuthRaw
+  ? sweepAzimuthRaw
+    .split(",")
+    .map((v) => Number(v.trim()))
+    .filter((v) => Number.isFinite(v))
+  : [];
 const slug = outputName
   || [
     "headless",
@@ -38,8 +45,45 @@ const slug = outputName
     hour !== null ? `h${String(hour).replace(".", "_")}` : null,
     debugMode ? "debug" : null,
   ].filter(Boolean).join("-");
-const canvasOutputPath = path.join(projectRoot, "output", `${slug}-canvas.png`);
-const pageOutputPath = path.join(projectRoot, "output", `${slug}-page.png`);
+
+function toRad(v) {
+  return Math.abs(v) > Math.PI * 2 ? (v * Math.PI) / 180 : v;
+}
+
+async function applyViewAndShot(page, view, localSlug) {
+  if (
+    view.azimuth !== null
+    || view.polar !== null
+    || view.distance !== null
+    || view.targetX !== null
+    || view.targetY !== null
+    || view.targetZ !== null
+  ) {
+    await page.evaluate((next) => {
+      if (typeof window.__setOrbitView === "function") {
+        window.__setOrbitView(next);
+      }
+    }, view);
+    await page.waitForTimeout(120);
+  }
+  const pagePath = path.join(projectRoot, "output", `${localSlug}-page.png`);
+  const canvasPath = path.join(projectRoot, "output", `${localSlug}-canvas.png`);
+  await page.screenshot({ path: pagePath, fullPage: true });
+  const canvasPngDataUrl = await page.evaluate(() => {
+    const canvas = window.__canvas || document.querySelector("canvas");
+    return canvas ? canvas.toDataURL("image/png") : null;
+  });
+  if (!canvasPngDataUrl) {
+    throw new Error("Canvas export failed: no canvas");
+  }
+  const base64 = canvasPngDataUrl.split(",")[1];
+  fs.writeFileSync(canvasPath, Buffer.from(base64, "base64"));
+  const shotStat = fs.statSync(canvasPath);
+  if (shotStat.size < 5000) {
+    throw new Error(`Screenshot too small (${shotStat.size} bytes), render likely failed`);
+  }
+  return { pagePath, canvasPath };
+}
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -109,31 +153,32 @@ try {
   const route = `/${search.size ? `?${search.toString()}` : ""}`;
   await page.goto(`http://127.0.0.1:${port}${route}`, { waitUntil: "networkidle" });
   await page.waitForTimeout(waitMs);
-  if (azimuth !== null || polar !== null || distance !== null || targetX !== null || targetY !== null || targetZ !== null) {
-    await page.evaluate((view) => {
-      if (typeof window.__setOrbitView === "function") {
-        window.__setOrbitView(view);
-      }
-    }, {
+  const outputs = [];
+  if (sweepAzimuth.length > 0) {
+    for (const sweepVal of sweepAzimuth) {
+      const rad = toRad(sweepVal);
+      const localSlug = `${slug}-az${Math.round((rad * 180) / Math.PI)}`;
+      const result = await applyViewAndShot(page, {
+        azimuth: rad,
+        polar,
+        distance,
+        targetX,
+        targetY,
+        targetZ,
+      }, localSlug);
+      outputs.push(result);
+    }
+  } else {
+    const result = await applyViewAndShot(page, {
       azimuth,
       polar,
       distance,
       targetX,
       targetY,
       targetZ,
-    });
-    await page.waitForTimeout(120);
+    }, slug);
+    outputs.push(result);
   }
-  await page.screenshot({ path: pageOutputPath, fullPage: true });
-  const canvasPngDataUrl = await page.evaluate(() => {
-    const canvas = window.__canvas || document.querySelector("canvas");
-    return canvas ? canvas.toDataURL("image/png") : null;
-  });
-  if (!canvasPngDataUrl) {
-    throw new Error("Canvas export failed: no canvas");
-  }
-  const base64 = canvasPngDataUrl.split(",")[1];
-  fs.writeFileSync(canvasOutputPath, Buffer.from(base64, "base64"));
 
   const diagnostics = await page.evaluate(() => {
     const state = window.__demoState || null;
@@ -153,11 +198,6 @@ try {
     throw new Error(`Renderer did not animate enough frames: ${JSON.stringify(diagnostics)}`);
   }
 
-  const shotStat = fs.statSync(canvasOutputPath);
-  if (shotStat.size < 5000) {
-    throw new Error(`Screenshot too small (${shotStat.size} bytes), render likely failed`);
-  }
-
   console.log(
     `Headless render OK. frames=${diagnostics.state.frames} t=${Number(
       diagnostics.state.lastTime,
@@ -165,8 +205,10 @@ try {
   );
   console.log(`Route: ${route}`);
   console.log(`Debug: ${JSON.stringify(diagnostics.state.debug || {})}`);
-  console.log(`Canvas screenshot: ${canvasOutputPath}`);
-  console.log(`Page screenshot: ${pageOutputPath}`);
+  for (const out of outputs) {
+    console.log(`Canvas screenshot: ${out.canvasPath}`);
+    console.log(`Page screenshot: ${out.pagePath}`);
+  }
 } finally {
   if (browser) await browser.close();
   await new Promise((resolve) => server.close(resolve));
