@@ -23,6 +23,9 @@ const debugMode = args.includes("--debug");
 const scene = getArg("scene");
 const hour = readNumberArg("hour");
 const hourRate = readNumberArg("hour-rate");
+const latitude = readNumberArg("lat");
+const longitude = readNumberArg("lon");
+const timeMultiplier = readNumberArg("time-multiplier");
 const azimuth = readNumberArg("azimuth");
 const polar = readNumberArg("polar");
 const distance = readNumberArg("distance");
@@ -150,8 +153,17 @@ try {
   if (scene) search.set("scene", scene);
   if (hour !== null) search.set("binaryHour", String(hour));
   if (hourRate !== null) search.set("binaryHourRate", String(hourRate));
+  if (latitude !== null) search.set("binaryLat", String(latitude));
+  if (longitude !== null) search.set("binaryLon", String(longitude));
   const route = `/${search.size ? `?${search.toString()}` : ""}`;
   await page.goto(`http://127.0.0.1:${port}${route}`, { waitUntil: "networkidle" });
+  if (timeMultiplier !== null) {
+    await page.evaluate((nextMultiplier) => {
+      if (typeof window.__setTimeMultiplier === "function") {
+        window.__setTimeMultiplier(nextMultiplier);
+      }
+    }, timeMultiplier);
+  }
   await page.waitForTimeout(waitMs);
   const outputs = [];
   if (sweepAzimuth.length > 0) {

@@ -514,10 +514,10 @@ const surfaceSky = new THREE.Mesh(
       uB: { value: new THREE.Vector3(0, 1, 0) },
     },
     vertexShader: `
-      varying vec3 vWorld;
+      varying vec3 vDir;
       void main() {
         vec4 world = modelMatrix * vec4(position, 1.0);
-        vWorld = world.xyz;
+        vDir = normalize(position);
         gl_Position = projectionMatrix * viewMatrix * world;
       }
     `,
@@ -527,9 +527,9 @@ const surfaceSky = new THREE.Mesh(
       uniform float uSecond;
       uniform vec3 uA;
       uniform vec3 uB;
-      varying vec3 vWorld;
+      varying vec3 vDir;
       void main() {
-        vec3 dir = normalize(vWorld);
+        vec3 dir = normalize(vDir);
         float h = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
         vec3 nightTop = vec3(0.004, 0.012, 0.045);
         vec3 nightHorizon = vec3(0.03, 0.045, 0.1);
@@ -1328,6 +1328,7 @@ const sceneLabels = Object.fromEntries(sceneDefinitions.map((sceneDef) => [scene
 hud.setSceneOptions(sceneDefinitions);
 hud.setTitle("NEON CLOCKTOWER // DEMOSCENE CUT");
 let binaryDayHours = binaryHourQuery !== null ? THREE.MathUtils.euclideanModulo(binaryHourQuery, 24) : 13.2;
+let binarySimulationDays = binaryDayHours / 24;
 const binaryHourRateBase = binaryHourRateQuery !== null ? binaryHourRateQuery : 0.12;
 let binaryTimeMultiplier = 1;
 let observerLatitudeDeg = binaryLatQuery !== null ? THREE.MathUtils.clamp(binaryLatQuery, -85, 85) : 0;
@@ -1707,9 +1708,12 @@ window.addEventListener("popstate", () => {
 window.__demoState = { ok: true, frames: 0, lastTime: 0, debug: {} };
 window.__canvas = canvas;
 window.__setBinaryTime = (hours) => {
-  if (Number.isFinite(hours)) binaryDayHours = THREE.MathUtils.euclideanModulo(hours, 24);
+  if (!Number.isFinite(hours)) return;
+  binaryDayHours = THREE.MathUtils.euclideanModulo(hours, 24);
+  binarySimulationDays = hours / 24;
 };
 window.__getBinaryTime = () => binaryDayHours;
+window.__getBinarySimulationDays = () => binarySimulationDays;
 window.__setObserverLatitude = (latDeg) => {
   if (!Number.isFinite(latDeg)) return;
   observerLatitudeDeg = THREE.MathUtils.clamp(latDeg, -85, 85);
@@ -1897,10 +1901,12 @@ function tick() {
   controls.update();
   const shouldCinematicBlend = cinematic;
   cinematicMix = THREE.MathUtils.lerp(cinematicMix, shouldCinematicBlend ? 1 : 0, 0.02);
+  const dayAdvance = dt * binaryHourRateBase * binaryTimeMultiplier;
   binaryDayHours = THREE.MathUtils.euclideanModulo(
-    binaryDayHours + dt * binaryHourRateBase * binaryTimeMultiplier,
+    binaryDayHours + dayAdvance,
     24,
   );
+  binarySimulationDays += dayAdvance / 24;
 
   let sceneDebug = {};
   if (activeSceneKey !== "clocktower") {
@@ -1911,6 +1917,7 @@ function tick() {
       cinematicMix,
       activeSceneKey,
       binaryDayHours,
+      binarySimulationDays,
       observerLatitudeDeg,
       observerLongitudeDeg,
       debugView,
@@ -1948,6 +1955,7 @@ function tick() {
     blenderCity: usingBlenderCity,
     debugView,
     timeMultiplier: binaryTimeMultiplier,
+    binarySimulationDays: Number(binarySimulationDays.toFixed(4)),
     observerLatitudeDeg: Number(observerLatitudeDeg.toFixed(2)),
     observerLongitudeDeg: Number(observerLongitudeDeg.toFixed(2)),
     cameraPos: [Number(camera.position.x.toFixed(3)), Number(camera.position.y.toFixed(3)), Number(camera.position.z.toFixed(3))],

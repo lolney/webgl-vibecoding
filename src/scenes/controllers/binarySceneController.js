@@ -41,6 +41,7 @@ export function updateBinaryScene(ctx, frame) {
     cinematicMix,
     activeSceneKey,
     binaryDayHours,
+    binarySimulationDays,
     observerLatitudeDeg,
     observerLongitudeDeg,
     debugView,
@@ -48,6 +49,7 @@ export function updateBinaryScene(ctx, frame) {
 
   const orbit = computeBinarySimulationState({
     binaryDayHours,
+    simulationDays: binarySimulationDays,
     planetOrbitRadius,
     cameraPosition: camera.position,
     cameraTarget: controls.target,
@@ -126,7 +128,7 @@ export function updateBinaryScene(ctx, frame) {
     if (isExternalScene) {
       timeIndicator.textContent = "System View";
     } else {
-      const phaseText = orbit.viewerLightDot > 0.0 ? "Day" : "Night";
+      const phaseText = Math.max(orbit.primaryAltitude, orbit.secondaryAltitude) > 0.0 ? "Day" : "Night";
       timeIndicator.textContent = `Time ${format24Hour(binaryDayHours)} ${phaseText}`;
     }
   }
@@ -224,6 +226,10 @@ export function updateBinaryScene(ctx, frame) {
     secondStrength,
     scene: activeSceneKey,
     time24: format24Hour(binaryDayHours),
+    primaryAltitudeDeg: THREE.MathUtils.radToDeg(orbit.primaryAltitude),
+    secondaryAltitudeDeg: THREE.MathUtils.radToDeg(orbit.secondaryAltitude),
+    primaryAzimuthDeg: THREE.MathUtils.radToDeg(orbit.primaryAzimuth),
+    secondaryAzimuthDeg: THREE.MathUtils.radToDeg(orbit.secondaryAzimuth),
     schematic: {
       starA: [orbit.starAPosition.x, orbit.starAPosition.z],
       starB: [orbit.starBPosition.x, orbit.starBPosition.z],
