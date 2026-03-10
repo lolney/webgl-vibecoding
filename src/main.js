@@ -15,6 +15,7 @@ import { binarySurfaceScene } from "./scenes/binarySurfaceScene.js";
 import { createSceneManager } from "./scenes/sceneManager.js";
 import { createHudPrimitive } from "./ui/hudPrimitive.js";
 import { createOrbitSchematic } from "./ui/orbitSchematic.js";
+import { createViewerSchematic } from "./ui/viewerSchematic.js";
 import { updateBinaryScene } from "./scenes/controllers/binarySceneController.js";
 import { updateClocktowerScene } from "./scenes/controllers/clocktowerSceneController.js";
 import { applySceneModeInternal } from "./scenes/controllers/sceneModeController.js";
@@ -23,6 +24,7 @@ const canvas = document.getElementById("gl");
 const audioButton = document.getElementById("audioToggle");
 const hud = createHudPrimitive();
 const orbitSchematic = createOrbitSchematic();
+const viewerSchematic = createViewerSchematic();
 const {
   sceneChooser,
   modeBadge,
@@ -40,6 +42,8 @@ const readNumberParam = (key) => {
 };
 const binaryHourQuery = readNumberParam("binaryHour");
 const binaryHourRateQuery = readNumberParam("binaryHourRate");
+const binaryLatQuery = readNumberParam("binaryLat");
+const binaryLonQuery = readNumberParam("binaryLon");
 
 const renderer = new THREE.WebGLRenderer({
   canvas,
@@ -1326,6 +1330,8 @@ hud.setTitle("NEON CLOCKTOWER // DEMOSCENE CUT");
 let binaryDayHours = binaryHourQuery !== null ? THREE.MathUtils.euclideanModulo(binaryHourQuery, 24) : 13.2;
 const binaryHourRateBase = binaryHourRateQuery !== null ? binaryHourRateQuery : 0.12;
 let binaryTimeMultiplier = 1;
+let observerLatitudeDeg = binaryLatQuery !== null ? THREE.MathUtils.clamp(binaryLatQuery, -85, 85) : 0;
+let observerLongitudeDeg = binaryLonQuery !== null ? binaryLonQuery : 0;
 let lastTickTime = 0;
 
 function updateTimeRateLabel() {
@@ -1404,6 +1410,7 @@ function applySceneMode(nextSceneKey, options = {}) {
     setCinematic,
   });
   orbitSchematic.setVisible(activeSceneKey === "binarySurface");
+  viewerSchematic.setVisible(activeSceneKey === "binarySurface");
   if (timeIndicator) {
     timeIndicator.style.display = activeSceneKey === "clocktower" ? "none" : "inline-block";
   }
@@ -1703,6 +1710,16 @@ window.__setBinaryTime = (hours) => {
   if (Number.isFinite(hours)) binaryDayHours = THREE.MathUtils.euclideanModulo(hours, 24);
 };
 window.__getBinaryTime = () => binaryDayHours;
+window.__setObserverLatitude = (latDeg) => {
+  if (!Number.isFinite(latDeg)) return;
+  observerLatitudeDeg = THREE.MathUtils.clamp(latDeg, -85, 85);
+};
+window.__getObserverLatitude = () => observerLatitudeDeg;
+window.__setObserverLongitude = (lonDeg) => {
+  if (!Number.isFinite(lonDeg)) return;
+  observerLongitudeDeg = lonDeg;
+};
+window.__getObserverLongitude = () => observerLongitudeDeg;
 window.__setTimeMultiplier = (mult) => {
   if (!Number.isFinite(mult)) return;
   binaryTimeMultiplier = THREE.MathUtils.clamp(Math.round(mult), 1, 5);
@@ -1894,9 +1911,12 @@ function tick() {
       cinematicMix,
       activeSceneKey,
       binaryDayHours,
+      observerLatitudeDeg,
+      observerLongitudeDeg,
       debugView,
     });
     orbitSchematic.render(activeSceneKey === "binarySurface" ? sceneDebug.schematic : null);
+    viewerSchematic.render(activeSceneKey === "binarySurface" ? sceneDebug.viewerInset : null);
   } else {
     clocktowerControllerCtx.usingBlenderTower = usingBlenderTower;
     clocktowerControllerCtx.usingBlenderCity = usingBlenderCity;
@@ -1910,6 +1930,7 @@ function tick() {
       cinematicMix,
     });
     orbitSchematic.render(null);
+    viewerSchematic.render(null);
   }
 
   window.__demoState.frames += 1;
@@ -1927,6 +1948,8 @@ function tick() {
     blenderCity: usingBlenderCity,
     debugView,
     timeMultiplier: binaryTimeMultiplier,
+    observerLatitudeDeg: Number(observerLatitudeDeg.toFixed(2)),
+    observerLongitudeDeg: Number(observerLongitudeDeg.toFixed(2)),
     cameraPos: [Number(camera.position.x.toFixed(3)), Number(camera.position.y.toFixed(3)), Number(camera.position.z.toFixed(3))],
     cameraTarget: [Number(controls.target.x.toFixed(3)), Number(controls.target.y.toFixed(3)), Number(controls.target.z.toFixed(3))],
     ...sceneDebug,

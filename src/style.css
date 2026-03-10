@@ -134,9 +134,50 @@ body {
   display: block;
 }
 
+.viewer-schematic {
+  position: fixed;
+  left: 18px;
+  top: 18px;
+  width: min(300px, 34vw);
+  height: min(248px, 33vh);
+  border: 1px solid #8ec7ff66;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 20px #66b8ff33;
+  pointer-events: none;
+  z-index: 5;
+  background: rgba(4, 10, 24, 0.8);
+}
+
+.viewer-schematic.hidden {
+  display: none;
+}
+
+#viewerSchematicCanvas {
+  width: 100%;
+  height: calc(100% - 28px);
+  display: block;
+}
+
+#viewerLatitude {
+  height: 28px;
+  line-height: 28px;
+  padding: 0 12px;
+  color: #fff3a9;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-size: 11px;
+  text-shadow: 0 0 10px #f8f45166;
+  border-top: 1px solid #8ec7ff33;
+}
+
 @media (max-width: 900px) {
   .orbit-schematic {
     width: min(280px, 48vw);
     height: min(190px, 26vh);
+  }
+  .viewer-schematic {
+    width: min(260px, 45vw);
+    height: min(220px, 29vh);
   }
 }

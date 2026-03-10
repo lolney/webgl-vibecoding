@@ -41,6 +41,8 @@ export function updateBinaryScene(ctx, frame) {
     cinematicMix,
     activeSceneKey,
     binaryDayHours,
+    observerLatitudeDeg,
+    observerLongitudeDeg,
     debugView,
   } = frame;
 
@@ -49,6 +51,8 @@ export function updateBinaryScene(ctx, frame) {
     planetOrbitRadius,
     cameraPosition: camera.position,
     cameraTarget: controls.target,
+    observerLatitude: THREE.MathUtils.degToRad(observerLatitudeDeg || 0),
+    observerLongitude: THREE.MathUtils.degToRad(observerLongitudeDeg || 0),
   });
   const {
     starAPosition,
@@ -232,6 +236,14 @@ export function updateBinaryScene(ctx, frame) {
       spinYaw: orbit.spinYaw,
       viewerYaw: orbit.viewerYaw,
       orbitRadius: orbit.orbitRadius,
+    },
+    viewerInset: {
+      latitudeDeg: THREE.MathUtils.radToDeg(orbit.observerLatitude),
+      observerNormal: [orbit.observerNormal.x, orbit.observerNormal.y, orbit.observerNormal.z],
+      viewerTangent: [orbit.viewerTangentWorld.x, orbit.viewerTangentWorld.y, orbit.viewerTangentWorld.z],
+      primaryDir: [orbit.primaryDir.x, orbit.primaryDir.y, orbit.primaryDir.z],
+      secondaryDir: [orbit.secondaryDir.x, orbit.secondaryDir.y, orbit.secondaryDir.z],
+      viewerLightDot: orbit.viewerLightDot,
     },
   };
 }

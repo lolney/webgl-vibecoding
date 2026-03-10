@@ -12,15 +12,6 @@ function extractViewerTurnYaw(cameraPosition, cameraTarget) {
   return Math.atan2(look.x, -look.z);
 }
 
-function buildLocalFrame(surfaceNormal) {
-  const worldUp = new THREE.Vector3(0, 1, 0);
-  const east = new THREE.Vector3().crossVectors(worldUp, surfaceNormal);
-  if (east.lengthSq() < 1e-8) east.set(1, 0, 0);
-  east.normalize();
-  const north = new THREE.Vector3().crossVectors(surfaceNormal, east).normalize();
-  return { east, north };
-}
-
 function projectToTangent(worldDir, surfaceNormal) {
   const tangent = worldDir.clone().sub(surfaceNormal.clone().multiplyScalar(worldDir.dot(surfaceNormal)));
   if (tangent.lengthSq() < 1e-8) return tangent.set(0, 0, 0);
@@ -72,6 +63,7 @@ export function computeBinarySimulationState({
   const lookWorld = new THREE.Vector3().copy(cameraTarget).sub(cameraPosition);
   if (lookWorld.lengthSq() < 1e-8) lookWorld.set(0, 0, -1);
   lookWorld.normalize();
+  const viewerTangentWorld = projectToTangent(lookWorld, observerNormal);
   const lookHorizontal = new THREE.Vector2(lookWorld.x, lookWorld.z);
   if (lookHorizontal.lengthSq() < 1e-8) lookHorizontal.set(0, -1);
   lookHorizontal.normalize();
@@ -120,6 +112,10 @@ export function computeBinarySimulationState({
     viewerTurnYaw: resolvedTurnYaw,
     observerYaw,
     viewerYaw,
+    observerLatitude,
+    observerLongitude,
+    observerNormal,
+    viewerTangentWorld,
     starAPosition,
     starBPosition,
     planetPosition,
