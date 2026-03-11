@@ -6,7 +6,7 @@
 - [] Lighting roadmap outline:
   - [] Phase 1: photometric cleanup
     - [x] Shared lighting state for binary scenes
-    - [~] Normalize light units and emissive source roles
+    - [x] Normalize light units and emissive source roles
   - [] Phase 2: atmospheric scattering
     - [x] Surface scattering approximation
     - [x] First-order sun-disc extinction

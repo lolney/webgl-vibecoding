@@ -42,12 +42,15 @@ function assert(condition, message) {
 assert(sunrise.lighting.primaryAirMass > 5, "Sunrise should have high primary air mass");
 assert(noon.lighting.primaryAirMass < 2, "Noon should have low primary air mass");
 assert(sunrise.lighting.primaryDirectIlluminance < noon.lighting.primaryDirectIlluminance, "Noon should be brighter than sunrise");
+assert(noon.lighting.primaryDirectLux > sunrise.lighting.primaryDirectLux, "Noon direct lux should exceed sunrise");
+assert(noon.lighting.primaryDiscLuminance > sunset.lighting.primaryDiscLuminance, "Noon disc luminance should exceed sunset");
 assert(sunrise.lighting.hazeFactor > noon.lighting.hazeFactor, "Sunrise haze should exceed noon haze");
 assert(sunset.primaryAltitudeDeg > -1.0 && sunset.primaryAltitudeDeg < 1.0, "Sunset preset should place primary star at horizon");
 assert(secondSun.secondaryAltitudeDeg > 8, "Second-sun preset should place secondary star above horizon");
 assert(secondSun.primaryAltitudeDeg < 0, "Second-sun preset should keep primary star below horizon");
 assert(night.lighting.daylightFactor < 0.05, "Night preset should have negligible daylight factor");
 assert(night.lighting.exposure < noon.lighting.exposure, "Night exposure should remain below noon exposure");
+assert(noon.lighting.primaryLightIntensity > noon.lighting.secondaryLightIntensity, "Primary local light should dominate secondary at noon");
 
 console.log("Lighting regression OK.");
 console.log(JSON.stringify({

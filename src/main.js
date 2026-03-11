@@ -2347,6 +2347,12 @@ function tick() {
       ? `airmass A ${sceneDebug.lighting.primaryAirMass.toFixed(2)} B ${sceneDebug.lighting.secondaryAirMass.toFixed(2)}`
       : "airmass A --.-- B --.--",
     sceneDebug.lighting
+      ? `directLux A ${sceneDebug.lighting.primaryDirectLux.toFixed(0)} B ${sceneDebug.lighting.secondaryDirectLux.toFixed(0)}`
+      : "directLux A ---- B ----",
+    sceneDebug.lighting
+      ? `discLum A ${sceneDebug.lighting.primaryDiscLuminance.toFixed(2)} B ${sceneDebug.lighting.secondaryDiscLuminance.toFixed(2)}`
+      : "discLum A --.-- B --.--",
+    sceneDebug.lighting
       ? `exposure ${sceneDebug.lighting.exposure.toFixed(3)} haze ${sceneDebug.lighting.hazeFactor.toFixed(3)}`
       : "exposure --.--- haze --.---",
   ] : []);

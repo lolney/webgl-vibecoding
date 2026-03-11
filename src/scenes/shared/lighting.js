@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { binaryLightModel } from "./lightModel.js";
 
 const PRIMARY_BASE = new THREE.Color(0xfff1cf);
 const SECONDARY_BASE = new THREE.Color(0xc9dcff);
@@ -58,7 +59,7 @@ function solarState({
   altitude,
   azimuth,
   localDir,
-  weight,
+  sourceModel,
   baseColor,
   extinction,
   haloBoost = 1,
@@ -73,7 +74,17 @@ function solarState({
   const scatterFactor = visibleFactor * (0.28 + horizonFactor * 0.72);
   const mieFactor = visibleFactor * (0.22 + horizonFactor * 1.1) * haloBoost;
   const transmittanceLuma = luma(transmittance);
-  const directIlluminance = directFactor * weight * transmittanceLuma;
+  const directIlluminanceLux = directFactor * sourceModel.topOfAtmosphereLux * transmittanceLuma;
+  const discLuminance = visibleFactor * sourceModel.visibleDiscLuminance * (0.42 + 0.72 * Math.sqrt(transmittanceLuma));
+  const haloLuminance = visibleFactor
+    * sourceModel.haloLuminance
+    * (0.1 + horizonFactor * 0.34 + transmittanceLuma * 0.08)
+    * haloBoost;
+  const localLightIntensity = visibleFactor * (
+    sourceModel.localLightBias
+    + directIlluminanceLux * sourceModel.localLightIntensityScale
+    + horizonFactor * sourceModel.localLightBias * 0.45
+  );
   return {
     altitude,
     altitudeDeg,
@@ -86,13 +97,16 @@ function solarState({
     apparentColor,
     visibleFactor,
     directFactor,
-    directIlluminance,
+    directIlluminanceLux,
     horizonFactor,
-    scatterFactor,
-    mieFactor,
+    scatterFactor: scatterFactor * sourceModel.atmosphereScatterScale,
+    mieFactor: mieFactor * sourceModel.atmosphereScatterScale,
     discScale: 0.96 + horizonFactor * 0.5,
-    discIntensity: visibleFactor * (0.42 + 0.72 * Math.sqrt(transmittanceLuma)),
-    haloStrength: visibleFactor * (0.1 + horizonFactor * 0.34 + transmittanceLuma * 0.08) * haloBoost,
+    discLuminance,
+    haloLuminance,
+    discIntensity: discLuminance,
+    haloStrength: haloLuminance,
+    localLightIntensity,
     reflectionGain: visibleFactor * (0.12 + horizonFactor * 0.8),
   };
 }
@@ -102,7 +116,7 @@ export function computeLightingState(orbit) {
     altitude: orbit.primaryAltitude,
     azimuth: orbit.primaryAzimuth,
     localDir: orbit.primaryLocalDir,
-    weight: 1.0,
+    sourceModel: binaryLightModel.primaryStar,
     baseColor: PRIMARY_BASE,
     extinction: PRIMARY_EXTINCTION,
     haloBoost: 1.0,
@@ -111,15 +125,15 @@ export function computeLightingState(orbit) {
     altitude: orbit.secondaryAltitude,
     azimuth: orbit.secondaryAzimuth,
     localDir: orbit.secondaryLocalDir,
-    weight: 0.42,
+    sourceModel: binaryLightModel.secondaryStar,
     baseColor: SECONDARY_BASE,
     extinction: SECONDARY_EXTINCTION,
     haloBoost: 0.74,
   });
 
-  const directTotal = primary.directIlluminance + secondary.directIlluminance;
+  const directTotalLux = primary.directIlluminanceLux + secondary.directIlluminanceLux;
   const maxAltitudeDeg = Math.max(primary.altitudeDeg, secondary.altitudeDeg);
-  const daylight = clamp01(directTotal * 6.6);
+  const daylight = smoothstep(1_500, 18_000, directTotalLux);
   const twilight = smoothstep(-12, -1.2, maxAltitudeDeg) * (1 - smoothstep(3, 14, maxAltitudeDeg));
   const night = clamp01(1 - daylight * 0.92 - twilight * 0.78);
   const haze = clamp01(0.18 + twilight * 0.52 + primary.horizonFactor * 0.2 + secondary.horizonFactor * 0.12);
@@ -144,16 +158,55 @@ export function computeLightingState(orbit) {
     .lerp(zenithColor, daylight * 0.42);
   const fogColor = horizonColor.clone().lerp(zenithColor, 0.34 + daylight * 0.18);
   const backgroundColor = fogColor.clone().multiplyScalar(0.78 + daylight * 0.14);
-  const exposure = THREE.MathUtils.clamp(0.29 + directTotal * 0.72 + daylight * 0.08 - horizonWarmth * 0.03, 0.26, 0.48);
+  const exposure = THREE.MathUtils.clamp(0.29 + daylight * 0.19 - horizonWarmth * 0.03, 0.26, 0.48);
 
-  const combinedSunDirection = orbit.primaryLocalDir.clone().multiplyScalar(primary.directIlluminance + 0.12)
-    .add(orbit.secondaryLocalDir.clone().multiplyScalar(secondary.directIlluminance + 0.04));
+  const combinedSunDirection = orbit.primaryLocalDir.clone().multiplyScalar(primary.directIlluminanceLux + 2000)
+    .add(orbit.secondaryLocalDir.clone().multiplyScalar(secondary.directIlluminanceLux + 1200));
   if (combinedSunDirection.lengthSq() < 1e-6) combinedSunDirection.set(0.2, 0.92, 0.34);
   combinedSunDirection.normalize();
+
+  const ambientLux = THREE.MathUtils.lerp(
+    binaryLightModel.ambientBounce.nightLux,
+    binaryLightModel.ambientBounce.dayLux,
+    daylight,
+  ) + secondary.directIlluminanceLux * binaryLightModel.ambientBounce.secondaryBounceScale / 10_000;
+  const fillLux = binaryLightModel.fillBounce.baseLux
+    + primary.directIlluminanceLux * binaryLightModel.fillBounce.primaryScale / 10_000
+    + secondary.directIlluminanceLux * binaryLightModel.fillBounce.secondaryScale / 10_000;
 
   return {
     primary,
     secondary,
+    sourceUnits: {
+      primaryTopOfAtmosphereLux: binaryLightModel.primaryStar.topOfAtmosphereLux,
+      secondaryTopOfAtmosphereLux: binaryLightModel.secondaryStar.topOfAtmosphereLux,
+      primaryDiscLuminance: primary.discLuminance,
+      secondaryDiscLuminance: secondary.discLuminance,
+      primaryHaloLuminance: primary.haloLuminance,
+      secondaryHaloLuminance: secondary.haloLuminance,
+    },
+    transport: {
+      primaryAirMass: primary.airMass,
+      secondaryAirMass: secondary.airMass,
+      primaryTransmittance: primary.transmittanceLuma,
+      secondaryTransmittance: secondary.transmittanceLuma,
+      daylight,
+      twilight,
+      night,
+      haze,
+    },
+    illumination: {
+      directTotalLux,
+      primaryDirectLux: primary.directIlluminanceLux,
+      secondaryDirectLux: secondary.directIlluminanceLux,
+      ambientLux,
+      fillLux,
+      primaryLightIntensity: primary.localLightIntensity,
+      secondaryLightIntensity: secondary.localLightIntensity,
+      atmosphereIntensity: binaryLightModel.atmosphere.baseIntensity
+        + daylight * binaryLightModel.atmosphere.daylightGain
+        + twilight * binaryLightModel.atmosphere.twilightGain,
+    },
     sky: {
       daylight,
       twilight,
@@ -180,9 +233,9 @@ export function computeLightingState(orbit) {
     surface: {
       combinedSunDirection,
       waterSunColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.18)
-        .multiplyScalar(0.14 + directTotal * 0.34),
+        .multiplyScalar(0.14 + daylight * 0.34),
       farWaterSunColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.26)
-        .multiplyScalar(0.18 + directTotal * 0.38),
+        .multiplyScalar(0.18 + daylight * 0.38),
       nearWaterColor: daylight > 0.35 ? new THREE.Color(0x0a2742) : new THREE.Color(0x07162a),
       farWaterColor: daylight > 0.35 ? new THREE.Color(0x103654) : new THREE.Color(0x0a1d35),
       distortionNear: THREE.MathUtils.lerp(0.44, 0.86, primary.horizonFactor),
@@ -190,16 +243,11 @@ export function computeLightingState(orbit) {
       sizeNear: THREE.MathUtils.lerp(2.1, 2.7, primary.horizonFactor),
       sizeFar: THREE.MathUtils.lerp(2.7, 3.5, primary.horizonFactor),
     },
-    photometric: {
-      directTotal,
-      ambientLevel: THREE.MathUtils.lerp(0.05, 0.31, daylight) + secondary.directIlluminance * 0.2,
-      fillLevel: 0.08 + primary.directIlluminance * 0.38 + secondary.directIlluminance * 0.24,
-      starLightA: 18 + primary.directIlluminance * 92 + primary.horizonFactor * 14,
-      starLightB: 4 + secondary.directIlluminance * 84 + secondary.horizonFactor * 9,
-      atmosphereIntensity: 0.24 + daylight * 0.18 + twilight * 0.08,
+    display: {
       bloomStrength: 0.004 + primary.horizonFactor * 0.014 + secondary.mieFactor * 0.01,
       bloomRadius: 0.02 + haze * 0.016 + secondary.horizonFactor * 0.008,
       bloomThreshold: THREE.MathUtils.lerp(0.9996, 0.988, primary.horizonFactor),
+      exposure,
     },
   };
 }
@@ -212,11 +260,24 @@ export function lightingDebugState(lighting) {
   return {
     primaryAirMass: Number(lighting.primary.airMass.toFixed(3)),
     secondaryAirMass: Number(lighting.secondary.airMass.toFixed(3)),
-    primaryDirectIlluminance: Number(lighting.primary.directIlluminance.toFixed(4)),
-    secondaryDirectIlluminance: Number(lighting.secondary.directIlluminance.toFixed(4)),
+    primaryDirectIlluminance: Number((lighting.illumination.primaryDirectLux / 100000).toFixed(4)),
+    secondaryDirectIlluminance: Number((lighting.illumination.secondaryDirectLux / 100000).toFixed(4)),
+    primaryDirectLux: Number(lighting.illumination.primaryDirectLux.toFixed(1)),
+    secondaryDirectLux: Number(lighting.illumination.secondaryDirectLux.toFixed(1)),
+    ambientLux: Number(lighting.illumination.ambientLux.toFixed(4)),
+    fillLux: Number(lighting.illumination.fillLux.toFixed(4)),
+    primaryDiscLuminance: Number(lighting.sourceUnits.primaryDiscLuminance.toFixed(3)),
+    secondaryDiscLuminance: Number(lighting.sourceUnits.secondaryDiscLuminance.toFixed(3)),
+    primaryHaloLuminance: Number(lighting.sourceUnits.primaryHaloLuminance.toFixed(3)),
+    secondaryHaloLuminance: Number(lighting.sourceUnits.secondaryHaloLuminance.toFixed(3)),
+    primaryTransmittance: Number(lighting.transport.primaryTransmittance.toFixed(4)),
+    secondaryTransmittance: Number(lighting.transport.secondaryTransmittance.toFixed(4)),
+    primaryLightIntensity: Number(lighting.illumination.primaryLightIntensity.toFixed(3)),
+    secondaryLightIntensity: Number(lighting.illumination.secondaryLightIntensity.toFixed(3)),
     daylightFactor: Number(lighting.sky.daylight.toFixed(4)),
     twilightFactor: Number(lighting.sky.twilight.toFixed(4)),
     hazeFactor: Number(lighting.sky.haze.toFixed(4)),
-    exposure: Number(lighting.sky.exposure.toFixed(4)),
+    exposure: Number(lighting.display.exposure.toFixed(4)),
+    bloomStrength: Number(lighting.display.bloomStrength.toFixed(4)),
   };
 }

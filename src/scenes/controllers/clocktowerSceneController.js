@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { clocktowerLightModel } from "../shared/lightModel.js";
 
 export function updateClocktowerScene(ctx, frame) {
   const {
@@ -61,8 +62,8 @@ export function updateClocktowerScene(ctx, frame) {
 
   const autoAngle = t * 0.19;
   renderer.toneMappingExposure = 0.62;
-  ambient.intensity = 0.56;
-  ambient.color.setHex(0x3346bb);
+  ambient.intensity = clocktowerLightModel.ambient.intensity;
+  ambient.color.setHex(clocktowerLightModel.ambient.color);
   scene.background.setHex(0x02030f);
   scene.fog.color.setHex(0x02030f);
   scene.fog.density = 0.065;
@@ -90,12 +91,28 @@ export function updateClocktowerScene(ctx, frame) {
   }
 
   const pulse = 0.45 + level * 0.85 + beat * 1.2;
-  const sectionBoost = section === 1 ? 1.22 : section === 3 ? 1.34 : 1.0;
-  beamLight.intensity = (520 + pulse * 980) * sectionBoost;
-  rim.intensity = (360 + Math.sin(t * 2.3) * 110 + pulse * 320) * sectionBoost;
-  key.intensity = 1.0 + Math.sin(t * 1.25) * 0.3 + level * 0.4 + (section === 2 ? 0.35 : 0);
-  moon.intensity = 0.7 + Math.sin(t * 0.4) * 0.15 + level * 0.25;
-  beamLight.distance = 62 + level * 6;
+  const sectionBoost = section === 1
+    ? clocktowerLightModel.sectionBoost.sectionOne
+    : section === 3
+      ? clocktowerLightModel.sectionBoost.sectionThree
+      : clocktowerLightModel.sectionBoost.default;
+  beamLight.intensity = (
+    clocktowerLightModel.beam.baseIntensity
+    + pulse * clocktowerLightModel.beam.pulseGain
+  ) * sectionBoost;
+  rim.intensity = (
+    clocktowerLightModel.rim.baseIntensity
+    + Math.sin(t * 2.3) * clocktowerLightModel.rim.swingIntensity
+    + pulse * clocktowerLightModel.rim.pulseGain
+  ) * sectionBoost;
+  key.intensity = clocktowerLightModel.key.baseIntensity
+    + Math.sin(t * 1.25) * clocktowerLightModel.key.swingIntensity
+    + level * clocktowerLightModel.key.levelGain
+    + (section === 2 ? clocktowerLightModel.key.sectionTwoBoost : 0);
+  moon.intensity = clocktowerLightModel.moon.baseIntensity
+    + Math.sin(t * 0.4) * clocktowerLightModel.moon.swingIntensity
+    + level * clocktowerLightModel.moon.levelGain;
+  beamLight.distance = clocktowerLightModel.beam.baseDistance + level * clocktowerLightModel.beam.levelDistanceGain;
 
   moonVisual.position.set(
     moonBase.x + Math.sin(t * 0.08) * 1.3,
@@ -112,13 +129,13 @@ export function updateClocktowerScene(ctx, frame) {
   moonReflection.scale.x = 0.9 + Math.abs(moonDir.x) * 0.7;
   moonReflection.material.uniforms.uTime.value = t;
   moonReflection.material.uniforms.uBeat.value = Math.min(1.0, level * 0.7 + beat * 0.8);
-  moonReflection.material.uniforms.uStrength.value = 1.55 + moon.intensity * 0.42;
+  moonReflection.material.uniforms.uStrength.value = 1.55 + moon.intensity * clocktowerLightModel.moon.reflectionGainPrimary;
 
   moonReflectionWide.position.x = moonReflection.position.x + 1.1;
   moonReflectionWide.position.z = moonReflection.position.z - 5.2;
   moonReflectionWide.material.uniforms.uTime.value = t * 0.85 + 4.0;
   moonReflectionWide.material.uniforms.uBeat.value = Math.min(1.0, level * 0.55 + beat * 0.6);
-  moonReflectionWide.material.uniforms.uStrength.value = 1.0 + moon.intensity * 0.28;
+  moonReflectionWide.material.uniforms.uStrength.value = 1.0 + moon.intensity * clocktowerLightModel.moon.reflectionGainWide;
 
   beaconBeam.rotation.z = Math.sin(t * 1.5) * 0.16 + beat * 0.06;
   beaconBeam.material.opacity = 0.11 + (Math.sin(t * 3.6) * 0.5 + 0.5) * 0.13 + level * 0.18;
@@ -145,8 +162,12 @@ export function updateClocktowerScene(ctx, frame) {
     const phase = t * (8.5 + i * 0.75) + i * 1.13;
     const hardStrobe = Math.pow(Math.max(0, Math.sin(phase)), section === 3 ? 7.5 : 5.8);
     const beatAmp = 1.0 + beat * 2.2;
-    const base = 60;
-    const peak = (section === 3 ? 4400 : 2800) * beatAmp;
+    const base = clocktowerLightModel.strobe.baseIntensity;
+    const peak = (
+      section === 3
+        ? clocktowerLightModel.strobe.sectionThreePeak
+        : clocktowerLightModel.strobe.sectionDefaultPeak
+    ) * beatAmp;
     spot.intensity = base + hardStrobe * peak;
     spot.angle = 0.16 + (Math.sin(t * 0.7 + i) * 0.5 + 0.5) * 0.14;
 

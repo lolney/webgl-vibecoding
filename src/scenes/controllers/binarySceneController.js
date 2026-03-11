@@ -73,7 +73,12 @@ export function updateBinaryScene(ctx, frame) {
   });
   const lighting = computeLightingState(orbit);
   const { primary, secondary } = lighting;
-  const { sky: skyLighting, surface: surfaceLighting, photometric } = lighting;
+  const {
+    sky: skyLighting,
+    surface: surfaceLighting,
+    illumination,
+    display,
+  } = lighting;
 
   starAGroup.position.copy(orbit.starAPosition);
   starBGroup.position.copy(orbit.starBPosition);
@@ -85,12 +90,12 @@ export function updateBinaryScene(ctx, frame) {
   cloudLayer.rotation.y = -t * 0.17;
 
   if (isSurfaceScene) {
-    ambient.intensity = photometric.ambientLevel;
+    ambient.intensity = illumination.ambientLux;
     ambient.color.copy(skyLighting.ambientColor);
     scene.fog.color.copy(skyLighting.fogColor);
     scene.background.copy(skyLighting.backgroundColor);
     scene.fog.density = skyLighting.fogDensity;
-    renderer.toneMappingExposure = skyLighting.exposure;
+    renderer.toneMappingExposure = display.exposure;
     stars.material.opacity = THREE.MathUtils.lerp(0.96, 0.12, skyLighting.daylight);
     stars.material.size = THREE.MathUtils.lerp(0.24, 0.06, skyLighting.daylight);
   } else if (isExternalScene) {
@@ -110,10 +115,10 @@ export function updateBinaryScene(ctx, frame) {
     binaryFill.intensity = 0.0;
     planetAtmosphere.material.uniforms.uIntensity.value = 0.22;
   } else {
-    binaryStarALight.intensity = photometric.starLightA;
-    binaryStarBLight.intensity = photometric.starLightB;
-    binaryFill.intensity = photometric.fillLevel;
-    planetAtmosphere.material.uniforms.uIntensity.value = photometric.atmosphereIntensity;
+    binaryStarALight.intensity = illumination.primaryLightIntensity;
+    binaryStarBLight.intensity = illumination.secondaryLightIntensity;
+    binaryFill.intensity = illumination.fillLux;
+    planetAtmosphere.material.uniforms.uIntensity.value = illumination.atmosphereIntensity;
   }
 
   if (timeIndicator) {
@@ -256,9 +261,9 @@ export function updateBinaryScene(ctx, frame) {
     binaryStarBLight.position.copy(camera.position).add(orbit.secondaryLocalDir.clone().multiplyScalar(84));
     binaryStarALight.color.copy(primary.apparentColor);
     binaryStarBLight.color.copy(secondary.apparentColor);
-    binaryStarALight.intensity = photometric.starLightA;
-    binaryStarBLight.intensity = photometric.starLightB;
-    binaryFill.intensity = photometric.fillLevel;
+    binaryStarALight.intensity = illumination.primaryLightIntensity;
+    binaryStarBLight.intensity = illumination.secondaryLightIntensity;
+    binaryFill.intensity = illumination.fillLux;
 
     surfaceGround.material.color.setRGB(
       THREE.MathUtils.lerp(0.01, 0.06, skyLighting.daylight),
@@ -289,9 +294,9 @@ export function updateBinaryScene(ctx, frame) {
   nebulaShell.material.uniforms.uOpacity.value = isExternalScene ? 0.2 : (isSurfaceScene ? 0.08 : 0.14);
   sky.rotation.y = -t * 0.003;
   if (isSurfaceScene) {
-    bloomPass.strength = photometric.bloomStrength + beat * 0.008;
-    bloomPass.radius = photometric.bloomRadius;
-    bloomPass.threshold = photometric.bloomThreshold;
+    bloomPass.strength = display.bloomStrength + beat * 0.008;
+    bloomPass.radius = display.bloomRadius;
+    bloomPass.threshold = display.bloomThreshold;
   } else if (isExternalScene) {
     bloomPass.strength = 0.24 + beat * 0.05;
     bloomPass.radius = 0.14;
@@ -303,7 +308,7 @@ export function updateBinaryScene(ctx, frame) {
   }
   crtPass.uniforms.uTime.value = t;
   crtPass.uniforms.uBeat.value = Math.min(1.0, beat * 0.9 + level * 0.35);
-  crtPass.uniforms.uGlitch.value = isSurfaceScene ? 0.04 + secondary.directIlluminance * 0.16 : 0.1;
+  crtPass.uniforms.uGlitch.value = isSurfaceScene ? 0.04 + secondary.directIlluminanceLux / 100000 * 0.16 : 0.1;
 
   if (debugView) {
     renderer.render(scene, camera);
@@ -313,7 +318,7 @@ export function updateBinaryScene(ctx, frame) {
 
   return {
     dayPhase: orbit.dayPhase,
-    secondStrength: secondary.directIlluminance,
+    secondStrength: secondary.directIlluminanceLux / 100000,
     scene: activeSceneKey,
     time24: format24Hour(binaryDayHours),
     primaryAltitudeDeg: primary.altitudeDeg,
