@@ -16,7 +16,7 @@
     - [x] Remove or isolate non-celestial helper lights in the planet scene
     - [x] Separate source radiometry, atmospheric transport, surface response, and display response
   - [] Phase 3: volumetrics
-    - [] Add volumetric aerial perspective
+    - [x] Add volumetric aerial perspective
     - [] Add physically directional light shafts for strong emitters
   - [] Phase 4: water and surface BRDF
     - [] Replace heuristic ocean reflections with Fresnel + rough-surface response

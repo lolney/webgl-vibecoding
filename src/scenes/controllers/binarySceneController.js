@@ -24,6 +24,7 @@ export function updateBinaryScene(ctx, frame) {
     cloudLayer,
     surfaceGround,
     surfaceSky,
+    surfaceHaze,
     surfaceOcean,
     surfaceOceanGeometry,
     surfaceFarOcean,
@@ -79,6 +80,7 @@ export function updateBinaryScene(ctx, frame) {
     surfaceResponse,
     illumination,
     display,
+    aerialPerspective,
   } = lighting;
 
   starAGroup.position.copy(orbit.starAPosition);
@@ -93,18 +95,18 @@ export function updateBinaryScene(ctx, frame) {
   if (isSurfaceScene) {
     binaryAmbient.intensity = illumination.ambientLux;
     binaryAmbient.color.copy(skyResponse.ambientColor);
-    scene.fog.color.copy(skyResponse.fogColor);
+    scene.fog.color.copy(aerialPerspective.surface.hazeColor);
     scene.background.copy(skyResponse.backgroundColor);
-    scene.fog.density = skyResponse.fogDensity;
+    scene.fog.density = skyResponse.fogDensity * 0.72 + aerialPerspective.surface.hazeOpacity * 0.045;
     renderer.toneMappingExposure = display.exposure;
     stars.material.opacity = THREE.MathUtils.lerp(0.96, 0.12, transport.daylight);
     stars.material.size = THREE.MathUtils.lerp(0.24, 0.06, transport.daylight);
   } else if (isExternalScene) {
     binaryAmbient.intensity = 0.0;
     binaryAmbient.color.setRGB(0.0, 0.0, 0.0);
-    scene.background.setHex(0x02030f);
-    scene.fog.color.setHex(0x02030f);
-    scene.fog.density = 0.019;
+    scene.background.copy(skyResponse.backgroundColor.clone().multiplyScalar(0.32));
+    scene.fog.color.copy(aerialPerspective.external.fogColor);
+    scene.fog.density = aerialPerspective.external.fogDensity;
     renderer.toneMappingExposure = 0.86;
     stars.material.opacity = 0.95;
     stars.material.size = 0.08;
@@ -114,13 +116,14 @@ export function updateBinaryScene(ctx, frame) {
     binaryStarALight.intensity = 8600;
     binaryStarBLight.intensity = 6400;
     binaryFill.intensity = 0.0;
-    planetAtmosphere.material.uniforms.uIntensity.value = 0.22;
+    planetAtmosphere.material.uniforms.uIntensity.value = aerialPerspective.external.atmosphereBoost;
   } else {
     binaryStarALight.intensity = illumination.primaryLightIntensity;
     binaryStarBLight.intensity = illumination.secondaryLightIntensity;
     binaryFill.intensity = illumination.fillLux;
     planetAtmosphere.material.uniforms.uIntensity.value = illumination.atmosphereIntensity;
   }
+  surfaceHaze.visible = isSurfaceScene;
 
   if (timeIndicator) {
     if (isExternalScene) {
@@ -162,6 +165,14 @@ export function updateBinaryScene(ctx, frame) {
     surfaceSky.visible = true;
     surfaceSky.position.copy(camera.position);
     surfaceSky.rotation.set(0, 0, 0);
+    surfaceHaze.visible = true;
+    surfaceHaze.position.copy(camera.position)
+      .add(surfaceForward.clone().multiplyScalar(aerialPerspective.surface.hazeDistance));
+    surfaceHaze.position.y = camera.position.y - 2.1;
+    surfaceHaze.scale.set(1.0, aerialPerspective.surface.hazeHeight, 1.0);
+    surfaceHaze.lookAt(camera.position);
+    surfaceHaze.material.uniforms.uColor.value.copy(aerialPerspective.surface.hazeColor);
+    surfaceHaze.material.uniforms.uOpacity.value = aerialPerspective.surface.hazeOpacity;
     surfaceGround.visible = false;
     surfaceGround.rotation.set(-Math.PI / 2, 0, 0);
     surfaceGround.position.set(camera.position.x, -0.14, camera.position.z);
@@ -200,6 +211,12 @@ export function updateBinaryScene(ctx, frame) {
     surfaceFarOcean.material.uniforms.distortionScale.value = surfaceResponse.distortionFar;
     surfaceFarOcean.material.uniforms.size.value = surfaceResponse.sizeFar;
     surfaceFarOcean.material.uniforms.waterColor.value.copy(surfaceResponse.farWaterColor);
+    if (surfaceOcean.material.uniforms.alpha) {
+      surfaceOcean.material.uniforms.alpha.value = 0.96;
+    }
+    if (surfaceFarOcean.material.uniforms.alpha) {
+      surfaceFarOcean.material.uniforms.alpha.value = aerialPerspective.surface.farAlpha;
+    }
 
     surfaceSunA.group.visible = primary.visibleFactor > 0.01;
     surfaceSunB.group.visible = secondary.visibleFactor > 0.01;
@@ -292,7 +309,9 @@ export function updateBinaryScene(ctx, frame) {
 
   stars.rotation.y = t * 0.004;
   nebulaShell.rotation.y = -t * 0.0025;
-  nebulaShell.material.uniforms.uOpacity.value = isExternalScene ? 0.2 : (isSurfaceScene ? 0.08 : 0.14);
+  nebulaShell.material.uniforms.uOpacity.value = isExternalScene
+    ? aerialPerspective.external.nebulaOpacity
+    : (isSurfaceScene ? 0.08 : 0.14);
   sky.rotation.y = -t * 0.003;
   if (isSurfaceScene) {
     bloomPass.strength = display.bloomStrength + beat * 0.008;

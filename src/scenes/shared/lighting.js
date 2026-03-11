@@ -163,6 +163,43 @@ function computeSurfaceResponse({ daylight, primary, secondary, orbit }) {
   };
 }
 
+function computeAerialPerspective({ transport, skyResponse }) {
+  const horizonLift = clamp01(
+    transport.twilight * 1.05
+      + transport.horizonWarmth * 0.72
+      + transport.daylight * 0.16,
+  );
+  const litHaze = clamp01(
+    transport.twilight * 0.9
+      + transport.horizonWarmth * 0.58
+      + transport.daylight * 0.12,
+  );
+  const surfaceHazeColor = skyResponse.horizonColor.clone().lerp(skyResponse.zenithColor, 0.18);
+  const externalHazeColor = skyResponse.zenithColor.clone().lerp(skyResponse.horizonColor, 0.42);
+  const clocktowerHazeColor = skyResponse.horizonColor.clone().multiplyScalar(0.24).add(new THREE.Color(0x07101d));
+
+  return {
+    surface: {
+      hazeColor: surfaceHazeColor,
+      hazeOpacity: THREE.MathUtils.lerp(0.018, 0.105, litHaze),
+      hazeDistance: THREE.MathUtils.lerp(100, 138, litHaze),
+      hazeHeight: THREE.MathUtils.lerp(12, 19, horizonLift),
+      farAlpha: THREE.MathUtils.lerp(0.9, 0.72, horizonLift),
+    },
+    external: {
+      fogColor: externalHazeColor,
+      fogDensity: THREE.MathUtils.lerp(0.011, 0.02, litHaze),
+      nebulaOpacity: THREE.MathUtils.lerp(0.12, 0.22, litHaze),
+      atmosphereBoost: THREE.MathUtils.lerp(0.18, 0.3, litHaze),
+    },
+    clocktower: {
+      fogColor: clocktowerHazeColor,
+      fogDensity: THREE.MathUtils.lerp(0.055, 0.074, litHaze),
+      farWaterAlpha: THREE.MathUtils.lerp(0.84, 0.68, horizonLift),
+    },
+  };
+}
+
 function solarState({
   altitude,
   azimuth,
@@ -281,6 +318,10 @@ export function computeLightingState(orbit) {
     secondary,
     orbit,
   });
+  const aerialPerspective = computeAerialPerspective({
+    transport,
+    skyResponse,
+  });
 
   return {
     primary,
@@ -330,6 +371,7 @@ export function computeLightingState(orbit) {
       primaryReflectionGain: primary.reflectionGain,
       secondaryReflectionGain: secondary.reflectionGain,
     },
+    aerialPerspective,
     display: {
       bloomStrength: 0.004 + primary.horizonFactor * 0.014 + secondary.mieFactor * 0.01,
       bloomRadius: 0.02 + haze * 0.016 + secondary.horizonFactor * 0.008,
@@ -367,6 +409,8 @@ export function lightingDebugState(lighting) {
     primaryReflectionGain: Number(lighting.surfaceOptics.primaryReflectionGain.toFixed(4)),
     secondaryReflectionGain: Number(lighting.surfaceOptics.secondaryReflectionGain.toFixed(4)),
     waterGlitterBlend: Number(lighting.surfaceResponse.glitterBlend.toFixed(4)),
+    surfaceHazeOpacity: Number(lighting.aerialPerspective.surface.hazeOpacity.toFixed(4)),
+    externalFogDensity: Number(lighting.aerialPerspective.external.fogDensity.toFixed(4)),
     primaryLightIntensity: Number(lighting.illumination.primaryLightIntensity.toFixed(3)),
     secondaryLightIntensity: Number(lighting.illumination.secondaryLightIntensity.toFixed(3)),
     daylightFactor: Number(lighting.transport.daylight.toFixed(4)),

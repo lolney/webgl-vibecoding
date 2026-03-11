@@ -53,6 +53,9 @@ assert(noon.lighting.extinctionBucketR < noon.lighting.extinctionBucketG, "Red e
 assert(noon.lighting.extinctionBucketG < noon.lighting.extinctionBucketB, "Green extinction bucket should stay below blue");
 assert(sunrise.lighting.waterGlitterBlend > night.lighting.waterGlitterBlend, "Sunrise water glitter should exceed night");
 assert(sunrise.lighting.primaryReflectionGain > night.lighting.primaryReflectionGain, "Primary reflection gain should exceed night");
+assert(sunset.lighting.surfaceHazeOpacity > noon.lighting.surfaceHazeOpacity, "Sunset haze opacity should exceed noon");
+assert(night.lighting.surfaceHazeOpacity < sunset.lighting.surfaceHazeOpacity, "Night haze opacity should stay below sunset");
+assert(sunset.lighting.externalFogDensity > noon.lighting.externalFogDensity, "External fog density should rise toward sunset");
 assert(sunset.primaryAltitudeDeg > -1.0 && sunset.primaryAltitudeDeg < 1.0, "Sunset preset should place primary star at horizon");
 assert(secondSun.secondaryAltitudeDeg > 8, "Second-sun preset should place secondary star above horizon");
 assert(secondSun.primaryAltitudeDeg < 0, "Second-sun preset should keep primary star below horizon");
