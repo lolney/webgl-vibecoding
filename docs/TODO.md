@@ -17,7 +17,7 @@
     - [x] Separate source radiometry, atmospheric transport, surface response, and display response
   - [] Phase 3: volumetrics
     - [x] Add volumetric aerial perspective
-    - [] Add physically directional light shafts for strong emitters
+    - [x] Add physically directional light shafts for strong emitters
   - [] Phase 4: water and surface BRDF
     - [] Replace heuristic ocean reflections with Fresnel + rough-surface response
     - [] Add shoreline and near-surface scattering cues
@@ -26,8 +26,8 @@
     - [] Rework the moon as a proper celestial light source
   - [] Phase 6: validation
     - [x] Lighting-specific headless regression coverage for key surface presets
-    - [] Extend debug dumps with transport, transmittance, and reflection metrics
-    - [] Add physical-plausibility acceptance checks
+    - [x] Extend debug dumps with transport, transmittance, and reflection metrics
+    - [x] Add physical-plausibility acceptance checks
   - [] See `docs/lighting-roadmap.md` for detail and rationale
 
 - [] Latitude setting in planet POV mode:

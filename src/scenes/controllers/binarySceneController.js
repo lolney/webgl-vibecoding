@@ -33,6 +33,8 @@ export function updateBinaryScene(ctx, frame) {
     surfaceFarOceanBasePos,
     surfaceSunA,
     surfaceSunB,
+    surfaceBeamA,
+    surfaceBeamB,
     surfaceReflectionA,
     surfaceReflectionB,
     bloomPass,
@@ -81,6 +83,7 @@ export function updateBinaryScene(ctx, frame) {
     illumination,
     display,
     aerialPerspective,
+    volumetrics,
   } = lighting;
 
   starAGroup.position.copy(orbit.starAPosition);
@@ -220,11 +223,14 @@ export function updateBinaryScene(ctx, frame) {
 
     surfaceSunA.group.visible = primary.visibleFactor > 0.01;
     surfaceSunB.group.visible = secondary.visibleFactor > 0.01;
+    surfaceBeamA.visible = false;
+    surfaceBeamB.visible = false;
     surfaceReflectionA.visible = false;
     surfaceReflectionB.visible = false;
 
     if (surfaceSunA.group.visible) {
-      surfaceSunA.group.position.copy(camera.position).add(orbit.primaryLocalDir.clone().multiplyScalar(86));
+      const sunPosA = camera.position.clone().add(orbit.primaryLocalDir.clone().multiplyScalar(86));
+      surfaceSunA.group.position.copy(sunPosA);
       surfaceSunA.group.lookAt(camera.position);
       surfaceSunA.core.material.uniforms.uColor.value.copy(primary.apparentColor);
       surfaceSunA.core.material.uniforms.uIntensity.value = primary.discIntensity;
@@ -233,6 +239,22 @@ export function updateBinaryScene(ctx, frame) {
       surfaceSunA.glow.material.uniforms.uStrength.value = primary.haloStrength;
       surfaceSunA.glow.material.uniforms.uIntensity.value = 0.9 + primary.horizonFactor * 0.35;
       surfaceSunA.group.scale.setScalar(primary.discScale);
+
+      if (volumetrics.primaryShaftStrength > 0.015) {
+        const shaftDirA = orbit.primaryLocalDir.clone().multiplyScalar(-1).add(new THREE.Vector3(0, -0.62, 0)).normalize();
+        const shaftNormalA = camera.position.clone().sub(sunPosA).normalize();
+        let shaftRightA = new THREE.Vector3().crossVectors(shaftNormalA, shaftDirA);
+        if (shaftRightA.lengthSq() < 1e-5) shaftRightA = new THREE.Vector3(1, 0, 0);
+        shaftRightA.normalize();
+        const shaftFacingA = new THREE.Vector3().crossVectors(shaftRightA, shaftDirA).normalize();
+        const shaftBasisA = new THREE.Matrix4().makeBasis(shaftRightA, shaftDirA, shaftFacingA);
+        surfaceBeamA.visible = true;
+        surfaceBeamA.position.copy(sunPosA).add(shaftDirA.clone().multiplyScalar(volumetrics.primaryLength * 0.58));
+        surfaceBeamA.quaternion.setFromRotationMatrix(shaftBasisA);
+        surfaceBeamA.scale.set(volumetrics.primaryRadius * 2.2, volumetrics.primaryLength, 1);
+        surfaceBeamA.material.uniforms.uColor.value.copy(primary.apparentColor);
+        surfaceBeamA.material.uniforms.uStrength.value = volumetrics.primaryShaftStrength * 1.8;
+      }
 
       const primaryAhead = Math.max(0, orbit.primaryLocalDir.dot(surfaceForward));
       const primaryRight = orbit.primaryLocalDir.dot(surfaceRight);
@@ -250,7 +272,8 @@ export function updateBinaryScene(ctx, frame) {
     }
 
     if (surfaceSunB.group.visible) {
-      surfaceSunB.group.position.copy(camera.position).add(orbit.secondaryLocalDir.clone().multiplyScalar(82));
+      const sunPosB = camera.position.clone().add(orbit.secondaryLocalDir.clone().multiplyScalar(82));
+      surfaceSunB.group.position.copy(sunPosB);
       surfaceSunB.group.lookAt(camera.position);
       surfaceSunB.core.material.uniforms.uColor.value.copy(secondary.apparentColor);
       surfaceSunB.core.material.uniforms.uIntensity.value = secondary.discIntensity;
@@ -259,6 +282,22 @@ export function updateBinaryScene(ctx, frame) {
       surfaceSunB.glow.material.uniforms.uStrength.value = secondary.haloStrength;
       surfaceSunB.glow.material.uniforms.uIntensity.value = 0.8 + secondary.horizonFactor * 0.28;
       surfaceSunB.group.scale.setScalar(secondary.discScale * 0.9);
+
+      if (volumetrics.secondaryShaftStrength > 0.015) {
+        const shaftDirB = orbit.secondaryLocalDir.clone().multiplyScalar(-1).add(new THREE.Vector3(0, -0.58, 0)).normalize();
+        const shaftNormalB = camera.position.clone().sub(sunPosB).normalize();
+        let shaftRightB = new THREE.Vector3().crossVectors(shaftNormalB, shaftDirB);
+        if (shaftRightB.lengthSq() < 1e-5) shaftRightB = new THREE.Vector3(1, 0, 0);
+        shaftRightB.normalize();
+        const shaftFacingB = new THREE.Vector3().crossVectors(shaftRightB, shaftDirB).normalize();
+        const shaftBasisB = new THREE.Matrix4().makeBasis(shaftRightB, shaftDirB, shaftFacingB);
+        surfaceBeamB.visible = true;
+        surfaceBeamB.position.copy(sunPosB).add(shaftDirB.clone().multiplyScalar(volumetrics.secondaryLength * 0.58));
+        surfaceBeamB.quaternion.setFromRotationMatrix(shaftBasisB);
+        surfaceBeamB.scale.set(volumetrics.secondaryRadius * 2.1, volumetrics.secondaryLength, 1);
+        surfaceBeamB.material.uniforms.uColor.value.copy(secondary.apparentColor);
+        surfaceBeamB.material.uniforms.uStrength.value = volumetrics.secondaryShaftStrength * 1.8;
+      }
 
       const secondaryAhead = Math.max(0, orbit.secondaryLocalDir.dot(surfaceForward));
       const secondaryRight = orbit.secondaryLocalDir.dot(surfaceRight);

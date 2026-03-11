@@ -200,6 +200,33 @@ function computeAerialPerspective({ transport, skyResponse }) {
   };
 }
 
+function computeVolumetrics({ transport, primary, secondary }) {
+  const atmosphericVisibility = clamp01(
+    transport.twilight * 0.92
+      + transport.haze * 0.34
+      + transport.daylight * 0.08,
+  );
+  const primaryStrength = primary.visibleFactor
+    * atmosphericVisibility
+    * Math.pow(primary.horizonFactor, 1.15)
+    * (0.28 + primary.transmittanceLuma * 0.34);
+  const secondaryStrength = secondary.visibleFactor
+    * atmosphericVisibility
+    * Math.pow(secondary.horizonFactor, 1.2)
+    * (0.2 + secondary.transmittanceLuma * 0.24)
+    * 0.84;
+
+  return {
+    primaryShaftStrength: primaryStrength,
+    secondaryShaftStrength: secondaryStrength,
+    primaryLength: THREE.MathUtils.lerp(18, 44, clamp01(primaryStrength * 1.2)),
+    secondaryLength: THREE.MathUtils.lerp(16, 34, clamp01(secondaryStrength * 1.5)),
+    primaryRadius: THREE.MathUtils.lerp(4.0, 9.5, clamp01(primaryStrength * 1.2)),
+    secondaryRadius: THREE.MathUtils.lerp(3.2, 7.4, clamp01(secondaryStrength * 1.5)),
+    atmosphericVisibility,
+  };
+}
+
 function solarState({
   altitude,
   azimuth,
@@ -322,6 +349,11 @@ export function computeLightingState(orbit) {
     transport,
     skyResponse,
   });
+  const volumetrics = computeVolumetrics({
+    transport,
+    primary,
+    secondary,
+  });
 
   return {
     primary,
@@ -372,6 +404,7 @@ export function computeLightingState(orbit) {
       secondaryReflectionGain: secondary.reflectionGain,
     },
     aerialPerspective,
+    volumetrics,
     display: {
       bloomStrength: 0.004 + primary.horizonFactor * 0.014 + secondary.mieFactor * 0.01,
       bloomRadius: 0.02 + haze * 0.016 + secondary.horizonFactor * 0.008,
@@ -411,6 +444,8 @@ export function lightingDebugState(lighting) {
     waterGlitterBlend: Number(lighting.surfaceResponse.glitterBlend.toFixed(4)),
     surfaceHazeOpacity: Number(lighting.aerialPerspective.surface.hazeOpacity.toFixed(4)),
     externalFogDensity: Number(lighting.aerialPerspective.external.fogDensity.toFixed(4)),
+    primaryShaftStrength: Number(lighting.volumetrics.primaryShaftStrength.toFixed(4)),
+    secondaryShaftStrength: Number(lighting.volumetrics.secondaryShaftStrength.toFixed(4)),
     primaryLightIntensity: Number(lighting.illumination.primaryLightIntensity.toFixed(3)),
     secondaryLightIntensity: Number(lighting.illumination.secondaryLightIntensity.toFixed(3)),
     daylightFactor: Number(lighting.transport.daylight.toFixed(4)),

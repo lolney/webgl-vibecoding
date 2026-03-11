@@ -777,12 +777,59 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
   return { group: g, core, glow };
 }
 
+function makeAtmosphericBeam(color) {
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1, 1, 24),
+    new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      side: THREE.DoubleSide,
+      blending: THREE.NormalBlending,
+      toneMapped: false,
+      uniforms: {
+        uColor: { value: new THREE.Color(color) },
+        uStrength: { value: 0.0 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uStrength;
+        varying vec2 vUv;
+        void main() {
+          vec2 p = vUv - 0.5;
+          float radial = 1.0 - smoothstep(0.0, 0.48, abs(p.x));
+          float axial = smoothstep(0.0, 0.26, vUv.y) * (1.0 - smoothstep(0.68, 1.0, vUv.y));
+          float taper = 1.0 - smoothstep(0.18, 0.5, abs(p.x) + (1.0 - vUv.y) * 0.18);
+          float streak = 0.9 + 0.1 * sin(vUv.y * 18.0 + p.x * 11.0);
+          float alpha = radial * axial * taper * streak * uStrength;
+          vec3 color = mix(uColor, vec3(1.0), 0.2) * (0.62 + alpha * 0.6);
+          gl_FragColor = vec4(color, alpha);
+        }
+      `,
+    }),
+  );
+  mesh.renderOrder = 118;
+  mesh.visible = false;
+  return mesh;
+}
+
 const surfaceSunA = makeSurfaceSun(0xfff2be, 0xffcb6d, 3.2, 16.0);
 const surfaceSunB = makeSurfaceSun(0xc6dbff, 0x7eb1ff, 2.4, 12.0);
+const surfaceBeamA = makeAtmosphericBeam(0xffd287);
+const surfaceBeamB = makeAtmosphericBeam(0x9fc6ff);
 surfaceSunA.group.visible = false;
 surfaceSunB.group.visible = false;
 surfacePovGroup.add(surfaceSunA.group);
 surfacePovGroup.add(surfaceSunB.group);
+surfacePovGroup.add(surfaceBeamA);
+surfacePovGroup.add(surfaceBeamB);
 
 const surfaceReflectionA = new THREE.Mesh(
   new THREE.PlaneGeometry(8, 160),
@@ -2244,6 +2291,8 @@ const binaryControllerCtx = {
   surfaceFarOceanBasePos,
   surfaceSunA,
   surfaceSunB,
+  surfaceBeamA,
+  surfaceBeamB,
   surfaceReflectionA,
   surfaceReflectionB,
   bloomPass,
