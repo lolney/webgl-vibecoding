@@ -25,6 +25,7 @@ export function updateBinaryScene(ctx, frame) {
     surfaceGround,
     surfaceSky,
     surfaceHaze,
+    surfaceScatterBand,
     surfaceOcean,
     surfaceOceanGeometry,
     surfaceFarOcean,
@@ -127,6 +128,7 @@ export function updateBinaryScene(ctx, frame) {
     planetAtmosphere.material.uniforms.uIntensity.value = illumination.atmosphereIntensity;
   }
   surfaceHaze.visible = isSurfaceScene;
+  surfaceScatterBand.visible = false;
 
   if (timeIndicator) {
     if (isExternalScene) {
@@ -176,6 +178,16 @@ export function updateBinaryScene(ctx, frame) {
     surfaceHaze.lookAt(camera.position);
     surfaceHaze.material.uniforms.uColor.value.copy(aerialPerspective.surface.hazeColor);
     surfaceHaze.material.uniforms.uOpacity.value = aerialPerspective.surface.hazeOpacity;
+    surfaceScatterBand.visible = surfaceResponse.scatterBandOpacity > 0.01;
+    if (surfaceScatterBand.visible) {
+      surfaceScatterBand.position.copy(camera.position)
+        .add(surfaceForward.clone().multiplyScalar(surfaceResponse.scatterBandDistance));
+      surfaceScatterBand.position.y = camera.position.y - 2.0;
+      surfaceScatterBand.scale.set(1.0, surfaceResponse.scatterBandHeight, 1.0);
+      surfaceScatterBand.lookAt(camera.position);
+      surfaceScatterBand.material.uniforms.uColor.value.copy(surfaceResponse.scatterBandColor);
+      surfaceScatterBand.material.uniforms.uOpacity.value = surfaceResponse.scatterBandOpacity;
+    }
     surfaceGround.visible = false;
     surfaceGround.rotation.set(-Math.PI / 2, 0, 0);
     surfaceGround.position.set(camera.position.x, -0.14, camera.position.z);

@@ -678,6 +678,41 @@ const surfaceHaze = new THREE.Mesh(
 surfaceHaze.renderOrder = 95;
 surfacePovGroup.add(surfaceHaze);
 
+const surfaceScatterBand = new THREE.Mesh(
+  new THREE.PlaneGeometry(220, 1, 1, 1),
+  new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    side: THREE.DoubleSide,
+    uniforms: {
+      uColor: { value: new THREE.Color(0xffd1a0) },
+      uOpacity: { value: 0.06 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying vec2 vUv;
+      void main() {
+        float horizonBand = smoothstep(0.0, 0.08, vUv.y) * (1.0 - smoothstep(0.16, 0.55, vUv.y));
+        float edgeFade = smoothstep(0.0, 0.12, vUv.x) * (1.0 - smoothstep(0.88, 1.0, vUv.x));
+        float alpha = horizonBand * edgeFade * uOpacity;
+        gl_FragColor = vec4(uColor, alpha);
+      }
+    `,
+  }),
+);
+surfaceScatterBand.renderOrder = 96;
+surfaceScatterBand.visible = false;
+surfacePovGroup.add(surfaceScatterBand);
+
 const surfaceGround = new THREE.Mesh(
   new THREE.PlaneGeometry(20000, 20000, 1, 1),
   new THREE.MeshPhysicalMaterial({
@@ -2283,6 +2318,7 @@ const binaryControllerCtx = {
   surfaceGround,
   surfaceSky,
   surfaceHaze,
+  surfaceScatterBand,
   surfaceOcean,
   surfaceOceanGeometry,
   surfaceFarOcean,

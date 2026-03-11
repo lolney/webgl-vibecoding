@@ -20,7 +20,7 @@
     - [x] Add physically directional light shafts for strong emitters
   - [] Phase 4: water and surface BRDF
     - [x] Replace heuristic ocean reflections with Fresnel + rough-surface response
-    - [] Add shoreline and near-surface scattering cues
+    - [x] Add shoreline and near-surface scattering cues
   - [] Phase 5: clocktower PBR lighting
     - [] Make spotlights and strobes more physically grounded
     - [] Rework the moon as a proper celestial light source

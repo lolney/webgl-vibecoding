@@ -95,6 +95,14 @@ function clampColor(color, maxValue = 1.5) {
   return color;
 }
 
+function compressColor(color, shoulder = 1.0) {
+  return new THREE.Color(
+    color.r / (1 + color.r / shoulder),
+    color.g / (1 + color.g / shoulder),
+    color.b / (1 + color.b / shoulder),
+  );
+}
+
 function computeSkyResponse({ daylight, twilight, haze, horizonWarmth, primary, secondary }) {
   const primaryRayleighRadiance = multiplyColor(primary.apparentColor, RAYLEIGH_COEFF)
     .multiplyScalar(primary.scatterFactor * (0.48 + primary.transmittanceLuma * 0.52));
@@ -112,12 +120,18 @@ function computeSkyResponse({ daylight, twilight, haze, horizonWarmth, primary, 
     .add(scaleColor(mieRadiance, 0.08 + haze * 0.04))
     .add(scaleColor(AIR_GLOW_COEFF, daylight * 0.06));
   const horizonRadiance = scaleColor(rayleighRadiance, 0.34 + twilight * 0.18)
-    .add(scaleColor(mieRadiance, 0.92 + haze * 0.52))
-    .add(scaleColor(primary.apparentColor, primary.horizonFactor * 0.14))
-    .add(scaleColor(secondary.apparentColor, secondary.horizonFactor * 0.08));
+    .add(scaleColor(mieRadiance, 0.58 + haze * 0.28))
+    .add(scaleColor(primary.apparentColor, primary.horizonFactor * 0.08))
+    .add(scaleColor(secondary.apparentColor, secondary.horizonFactor * 0.05));
 
-  const zenithColor = clampColor(NIGHT_ZENITH.clone().add(zenithRadiance), 1.2);
-  const horizonColor = clampColor(NIGHT_HORIZON.clone().add(horizonRadiance), 1.25);
+  const zenithColor = clampColor(
+    compressColor(NIGHT_ZENITH.clone().add(zenithRadiance), 1.02),
+    1.0,
+  );
+  const horizonColor = clampColor(
+    compressColor(NIGHT_HORIZON.clone().add(horizonRadiance), 0.96),
+    0.94,
+  );
   const ambientColor = NIGHT_HORIZON.clone()
     .lerp(horizonColor, twilight * 0.55 + daylight * 0.3)
     .lerp(zenithColor, daylight * 0.42);
@@ -183,15 +197,23 @@ function computeSurfaceResponse({ daylight, primary, secondary, orbit }) {
     secondaryGlitter,
     glitterBlend,
     waterSunColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.18)
-      .multiplyScalar(0.05 + (primarySpecGain + secondarySpecGain * 0.65) * 3.6),
+      .multiplyScalar(0.03 + (primarySpecGain + secondarySpecGain * 0.65) * 2.1),
     farWaterSunColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.26)
-      .multiplyScalar(0.06 + (primarySpecGain + secondarySpecGain * 0.72) * 4.2),
+      .multiplyScalar(0.035 + (primarySpecGain + secondarySpecGain * 0.72) * 2.5),
     nearWaterColor: nearWaterBase.add(skyTintNear),
     farWaterColor: farWaterBase.add(skyTintFar),
     distortionNear: THREE.MathUtils.lerp(0.28, 0.58, roughnessNear + waterFresnel * 0.22),
     distortionFar: THREE.MathUtils.lerp(0.42, 0.82, roughnessFar + waterFresnel * 0.18),
     sizeNear: THREE.MathUtils.lerp(1.6, 2.15, roughnessNear + waterFresnel * 0.18),
     sizeFar: THREE.MathUtils.lerp(2.2, 2.95, roughnessFar + waterFresnel * 0.16),
+    scatterBandColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.22)
+      .lerp(new THREE.Color(0xffdfb7), 0.34),
+    scatterBandOpacity: clamp01(
+      (0.008 + waterFresnel * 0.04)
+      * (0.18 + primary.horizonFactor * 0.42 + secondary.horizonFactor * 0.18),
+    ),
+    scatterBandDistance: THREE.MathUtils.lerp(92, 118, waterFresnel),
+    scatterBandHeight: THREE.MathUtils.lerp(5.5, 9.5, waterFresnel),
     waterFresnel,
     primarySpecular,
     secondarySpecular,
@@ -345,7 +367,11 @@ export function computeLightingState(orbit) {
     primary.horizonFactor * primary.visibleFactor * 0.88
       + secondary.horizonFactor * secondary.visibleFactor * 0.34,
   );
-  const exposure = THREE.MathUtils.clamp(0.29 + daylight * 0.19 - horizonWarmth * 0.03, 0.26, 0.48);
+  const exposure = THREE.MathUtils.clamp(
+    0.285 + daylight * 0.17 - horizonWarmth * 0.055 - twilight * 0.04,
+    0.25,
+    0.46,
+  );
 
   const ambientLux = THREE.MathUtils.lerp(
     binaryLightModel.ambientBounce.nightLux,
@@ -441,9 +467,13 @@ export function computeLightingState(orbit) {
     aerialPerspective,
     volumetrics,
     display: {
-      bloomStrength: 0.004 + primary.horizonFactor * 0.014 + secondary.mieFactor * 0.01,
-      bloomRadius: 0.02 + haze * 0.016 + secondary.horizonFactor * 0.008,
-      bloomThreshold: THREE.MathUtils.lerp(0.9996, 0.988, primary.horizonFactor),
+      bloomStrength: 0.003 + primary.horizonFactor * 0.006 + secondary.mieFactor * 0.005,
+      bloomRadius: 0.018 + haze * 0.01 + secondary.horizonFactor * 0.005,
+      bloomThreshold: THREE.MathUtils.lerp(
+        0.9997,
+        0.9962,
+        Math.max(primary.horizonFactor, secondary.horizonFactor * 0.75),
+      ),
       exposure,
     },
   };
