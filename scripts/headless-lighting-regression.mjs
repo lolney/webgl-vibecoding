@@ -42,12 +42,15 @@ function assert(condition, message) {
 assert(sunrise.lighting.primaryAirMass > 5, "Sunrise should have high primary air mass");
 assert(noon.lighting.primaryAirMass < 2, "Noon should have low primary air mass");
 assert(sunrise.lighting.primaryDirectIlluminance < noon.lighting.primaryDirectIlluminance, "Noon should be brighter than sunrise");
+assert(sunrise.lighting.primaryTransmittance < noon.lighting.primaryTransmittance, "Sunrise transmittance should be below noon");
 assert(noon.lighting.primaryDirectLux > sunrise.lighting.primaryDirectLux, "Noon direct lux should exceed sunrise");
 assert(noon.lighting.primaryDiscLuminance > sunset.lighting.primaryDiscLuminance, "Noon disc luminance should exceed sunset");
 assert(sunrise.lighting.hazeFactor > noon.lighting.hazeFactor, "Sunrise haze should exceed noon haze");
 assert(sunset.lighting.skyHorizonLuminance > night.lighting.skyHorizonLuminance, "Sunset horizon should be brighter than night horizon");
 assert(sunset.lighting.skyHorizonLuminance > sunset.lighting.skyZenithLuminance, "Sunset horizon should dominate sunset zenith");
 assert(noon.lighting.skyZenithLuminance > night.lighting.skyZenithLuminance, "Noon zenith should exceed night zenith");
+assert(noon.lighting.extinctionBucketR < noon.lighting.extinctionBucketG, "Red extinction bucket should stay below green");
+assert(noon.lighting.extinctionBucketG < noon.lighting.extinctionBucketB, "Green extinction bucket should stay below blue");
 assert(sunset.primaryAltitudeDeg > -1.0 && sunset.primaryAltitudeDeg < 1.0, "Sunset preset should place primary star at horizon");
 assert(secondSun.secondaryAltitudeDeg > 8, "Second-sun preset should place secondary star above horizon");
 assert(secondSun.primaryAltitudeDeg < 0, "Second-sun preset should keep primary star below horizon");

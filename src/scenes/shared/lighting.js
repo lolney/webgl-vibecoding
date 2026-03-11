@@ -8,9 +8,9 @@ const NIGHT_HORIZON = new THREE.Color(0x081428);
 const RAYLEIGH_COEFF = new THREE.Color(0.33, 0.56, 1.0);
 const MIE_COEFF = new THREE.Color(1.0, 0.91, 0.76);
 const AIR_GLOW_COEFF = new THREE.Color(0.14, 0.2, 0.32);
-
-const PRIMARY_EXTINCTION = new THREE.Vector3(0.045, 0.082, 0.17);
-const SECONDARY_EXTINCTION = new THREE.Vector3(0.052, 0.094, 0.19);
+const EXTINCTION_WAVELENGTHS_NM = { r: 680, g: 550, b: 440 };
+const RAYLEIGH_EXTINCTION_SCALE = 0.028;
+const AEROSOL_EXTINCTION_SCALE = 0.008;
 
 function clamp01(v) {
   return THREE.MathUtils.clamp(v, 0, 1);
@@ -38,11 +38,28 @@ function multiplyColor(a, b) {
   return new THREE.Color(a.r * b.r, a.g * b.g, a.b * b.b);
 }
 
-function transmittanceFromAirMass(extinction, airMass) {
+function wavelengthPower(lambdaNm, exponent) {
+  return Math.pow(EXTINCTION_WAVELENGTHS_NM.g / lambdaNm, exponent);
+}
+
+function atmosphericExtinctionBuckets() {
   return new THREE.Color(
-    Math.exp(-extinction.x * airMass),
-    Math.exp(-extinction.y * airMass),
-    Math.exp(-extinction.z * airMass),
+    RAYLEIGH_EXTINCTION_SCALE * wavelengthPower(EXTINCTION_WAVELENGTHS_NM.r, 4)
+      + AEROSOL_EXTINCTION_SCALE * wavelengthPower(EXTINCTION_WAVELENGTHS_NM.r, 1.3),
+    RAYLEIGH_EXTINCTION_SCALE * wavelengthPower(EXTINCTION_WAVELENGTHS_NM.g, 4)
+      + AEROSOL_EXTINCTION_SCALE * wavelengthPower(EXTINCTION_WAVELENGTHS_NM.g, 1.3),
+    RAYLEIGH_EXTINCTION_SCALE * wavelengthPower(EXTINCTION_WAVELENGTHS_NM.b, 4)
+      + AEROSOL_EXTINCTION_SCALE * wavelengthPower(EXTINCTION_WAVELENGTHS_NM.b, 1.3),
+  );
+}
+
+const ATMOSPHERIC_EXTINCTION = atmosphericExtinctionBuckets();
+
+function transmittanceFromAirMass(airMass) {
+  return new THREE.Color(
+    Math.exp(-ATMOSPHERIC_EXTINCTION.r * airMass),
+    Math.exp(-ATMOSPHERIC_EXTINCTION.g * airMass),
+    Math.exp(-ATMOSPHERIC_EXTINCTION.b * airMass),
   );
 }
 
@@ -75,12 +92,11 @@ function solarState({
   localDir,
   sourceModel,
   baseColor,
-  extinction,
   haloBoost = 1,
 }) {
   const altitudeDeg = THREE.MathUtils.radToDeg(altitude);
   const airMass = airMassFromAltitude(altitude);
-  const transmittance = transmittanceFromAirMass(extinction, airMass);
+  const transmittance = transmittanceFromAirMass(airMass);
   const apparentColor = apparentSolarColor(baseColor, transmittance);
   const visibleFactor = smoothstep(-4.5, 2.0, altitudeDeg);
   const directFactor = clamp01(Math.sin(Math.max(0, altitude)));
@@ -132,7 +148,6 @@ export function computeLightingState(orbit) {
     localDir: orbit.primaryLocalDir,
     sourceModel: binaryLightModel.primaryStar,
     baseColor: PRIMARY_BASE,
-    extinction: PRIMARY_EXTINCTION,
     haloBoost: 1.0,
   });
   const secondary = solarState({
@@ -141,7 +156,6 @@ export function computeLightingState(orbit) {
     localDir: orbit.secondaryLocalDir,
     sourceModel: binaryLightModel.secondaryStar,
     baseColor: SECONDARY_BASE,
-    extinction: SECONDARY_EXTINCTION,
     haloBoost: 0.74,
   });
 
@@ -295,6 +309,9 @@ export function lightingDebugState(lighting) {
     secondaryDirectLux: Number(lighting.illumination.secondaryDirectLux.toFixed(1)),
     ambientLux: Number(lighting.illumination.ambientLux.toFixed(4)),
     fillLux: Number(lighting.illumination.fillLux.toFixed(4)),
+    extinctionBucketR: Number(ATMOSPHERIC_EXTINCTION.r.toFixed(4)),
+    extinctionBucketG: Number(ATMOSPHERIC_EXTINCTION.g.toFixed(4)),
+    extinctionBucketB: Number(ATMOSPHERIC_EXTINCTION.b.toFixed(4)),
     skyZenithLuminance: Number(luma(lighting.sky.zenithColor).toFixed(4)),
     skyHorizonLuminance: Number(luma(lighting.sky.horizonColor).toFixed(4)),
     primaryDiscLuminance: Number(lighting.sourceUnits.primaryDiscLuminance.toFixed(3)),

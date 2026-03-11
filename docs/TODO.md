@@ -11,7 +11,7 @@
     - [x] Surface scattering approximation
     - [x] First-order sun-disc extinction
     - [x] Move from palette-driven sky color to atmosphere-derived radiance
-    - [] Upgrade extinction from RGB heuristics to coarse wavelength-bucket modeling
+    - [x] Upgrade extinction from RGB heuristics to coarse wavelength-bucket modeling
   - [] Cross-cutting cleanup
     - [] Remove or isolate non-celestial helper lights in the planet scene
     - [] Separate source radiometry, atmospheric transport, surface response, and display response
