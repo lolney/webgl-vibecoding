@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { clocktowerLightModel } from "../shared/lightModel.js";
 import {
   computeClocktowerLightingState,
+  computeClocktowerMoonState,
   clocktowerLightingDebugState,
 } from "../shared/clocktowerLighting.js";
 
@@ -19,6 +20,7 @@ export function updateClocktowerScene(ctx, frame) {
     rim,
     moon,
     moonVisual,
+    moonDisk,
     moonHalo,
     moonReflection,
     moonReflectionWide,
@@ -114,23 +116,42 @@ export function updateClocktowerScene(ctx, frame) {
     moonBase.y + Math.sin(t * 0.06) * 0.5,
     moonBase.z + Math.cos(t * 0.07) * 1.2,
   );
+  const moonState = computeClocktowerMoonState({
+    moonPosition: moonVisual.position,
+    cameraPosition: camera.position,
+    waterHeight: moonReflection.position.y,
+  });
   moon.position.copy(moonVisual.position).normalize().multiplyScalar(28);
   moonDir.copy(moon.position).normalize();
   moonVisual.lookAt(camera.position);
-  moonHalo.material.uniforms.uPulse.value = lighting.moon.haloPulse;
+  moon.color.copy(moonState.discColor);
+  moon.intensity *= 0.62 + moonState.transmittanceLuma * 0.38;
+  moonDisk.material.color.copy(moonState.discColor);
+  moonDisk.material.opacity = moonState.discOpacity;
+  moonDisk.scale.setScalar(moonState.discScale);
+  moonHalo.material.uniforms.uPulse.value = lighting.moon.haloPulse * moonState.haloPulse;
+  moonHalo.scale.setScalar(moonState.haloScale);
 
-  moonReflection.position.x = THREE.MathUtils.clamp(moonVisual.position.x * 0.5, -18.0, -12.0);
-  moonReflection.position.z = shorelineZ - 20.0 + Math.max(-5, moonVisual.position.z + 36.0) * 0.12;
-  moonReflection.scale.x = 0.9 + Math.abs(moonDir.x) * 0.7;
+  moonReflection.position.copy(moonState.reflectionCenter);
+  moonReflection.position.z = Math.min(moonReflection.position.z, shorelineZ - 2.4);
+  moonReflection.scale.set(
+    moonState.reflectionPrimaryScale.x,
+    moonState.reflectionPrimaryScale.y,
+    1.0,
+  );
   moonReflection.material.uniforms.uTime.value = t;
   moonReflection.material.uniforms.uBeat.value = Math.min(1.0, level * 0.7 + beat * 0.8);
-  moonReflection.material.uniforms.uStrength.value = lighting.moon.reflectionPrimary;
+  moonReflection.material.uniforms.uStrength.value = lighting.moon.reflectionPrimary * moonState.reflectionStrength * 1.35;
 
-  moonReflectionWide.position.x = moonReflection.position.x + 1.1;
-  moonReflectionWide.position.z = moonReflection.position.z - 5.2;
+  moonReflectionWide.position.copy(moonReflection.position).add(new THREE.Vector3(0.9, -0.001, -4.8));
+  moonReflectionWide.scale.set(
+    moonState.reflectionWideScale.x,
+    moonState.reflectionWideScale.y,
+    1.0,
+  );
   moonReflectionWide.material.uniforms.uTime.value = t * 0.85 + 4.0;
   moonReflectionWide.material.uniforms.uBeat.value = Math.min(1.0, level * 0.55 + beat * 0.6);
-  moonReflectionWide.material.uniforms.uStrength.value = lighting.moon.reflectionWide;
+  moonReflectionWide.material.uniforms.uStrength.value = lighting.moon.reflectionWide * moonState.reflectionStrength;
 
   beaconBeam.rotation.z = lighting.beam.sweep;
   beaconBeam.material.opacity = lighting.beam.coneOpacity;
@@ -143,12 +164,12 @@ export function updateClocktowerScene(ctx, frame) {
   displaceWaterGeometry(farOceanGeometry, farOceanBasePos, t * 0.72 + 5.0, 0.95 + level * 0.2);
 
   ocean.material.uniforms.time.value = t * 0.48;
-  ocean.material.uniforms.sunDirection.value.copy(key.position).normalize();
+  ocean.material.uniforms.sunDirection.value.copy(moonDir);
   ocean.material.uniforms.distortionScale.value = 3.2 + level * 1.5 + beat * 2.1;
   ocean.position.x = Math.sin(t * 0.05) * 2.0;
   ocean.rotation.z = Math.sin(t * 0.04) * 0.004;
   farOcean.material.uniforms.time.value = t * 0.36 + 12.0;
-  farOcean.material.uniforms.sunDirection.value.copy(key.position).normalize();
+  farOcean.material.uniforms.sunDirection.value.copy(moonDir);
   farOcean.material.uniforms.distortionScale.value = 4.4 + level * 1.2;
 
   stars.rotation.y = t * 0.01;
@@ -169,7 +190,18 @@ export function updateClocktowerScene(ctx, frame) {
     cone.position.copy(spot.position);
     tmpDir.copy(target.position).sub(spot.position).normalize();
     cone.quaternion.setFromUnitVectors(upAxis, tmpDir);
-    cone.material.opacity = strobe.coneOpacity;
+    const cameraToSpot = camera.position.clone().sub(spot.position).normalize();
+    const viewAlignment = Math.abs(tmpDir.dot(cameraToSpot));
+    const viewFade = 1 - THREE.MathUtils.smoothstep(viewAlignment, 0.38, 0.9);
+    const cameraOffset = camera.position.clone().sub(spot.position);
+    const axisProjection = THREE.MathUtils.clamp(cameraOffset.dot(tmpDir), 0, strobe.distance);
+    const closestPoint = spot.position.clone().add(tmpDir.clone().multiplyScalar(axisProjection));
+    const radialDistance = closestPoint.distanceTo(camera.position);
+    const coneRadiusAtCamera = Math.max(0.22, Math.tan(strobe.angle) * axisProjection);
+    const insideFade = THREE.MathUtils.smoothstep(radialDistance / coneRadiusAtCamera, 0.72, 1.08);
+    const sectionConeScale = section === 3 ? 0.62 : 0.0;
+    cone.material.opacity = strobe.coneOpacity * viewFade * insideFade * sectionConeScale;
+    cone.visible = section === 3 && cone.material.opacity > 0.002;
     const radiusScale = THREE.MathUtils.clamp(
       (strobe.distance * Math.tan(strobe.angle)) / (58 * Math.tan(0.2)),
       0.8,
@@ -226,6 +258,11 @@ export function updateClocktowerScene(ctx, frame) {
     scene: "clocktower",
     section,
     oceanTime: Number(ocean.material.uniforms.time.value.toFixed(2)),
-    lighting: clocktowerLightingDebugState(lighting),
+    lighting: {
+      ...clocktowerLightingDebugState(lighting),
+      moonAltitudeDeg: Number(moonState.altitudeDeg.toFixed(3)),
+      moonAirMass: Number(moonState.airMass.toFixed(3)),
+      moonReflectionStrength: Number(moonState.reflectionStrength.toFixed(4)),
+    },
   };
 }

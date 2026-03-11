@@ -53,6 +53,8 @@ assert(strobeCore.lighting.strobePeakIntensity > hyperLift.lighting.strobePeakIn
 assert(strobeCore.lighting.activeStrobes >= hyperLift.lighting.activeStrobes, "Strobe Core should have at least as many active strobes");
 assert(strobeCore.lighting.exposure < hyperLift.lighting.exposure, "Strobe Core exposure should compress below Hyper Lift");
 assert(nightGlide.lighting.moonIntensity > 0.6, "Night Glide moon intensity should remain non-trivial");
+assert(hyperLift.lighting.moonAltitudeDeg > 5, "Moon should remain above the horizon in Hyper Lift");
+assert(nightGlide.lighting.moonReflectionStrength > 0.15, "Moon reflection should remain visible in Night Glide");
 
 console.log("Clocktower lighting regression OK.");
 console.log(JSON.stringify({

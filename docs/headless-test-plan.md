@@ -115,6 +115,7 @@ Validate critical behaviors for:
   - `Hyper Lift` beam intensity and cone visibility exceed `Night Glide`
   - `Strobe Core` strobe intensity exceeds `Hyper Lift`
   - `Strobe Core` exposure compresses below `Hyper Lift`
+  - moon remains above the horizon and produces a visible reflection response
 
 ## Results
 
@@ -188,4 +189,5 @@ Validate critical behaviors for:
   - `Hyper Lift`: `beamIntensity=2376.987`, `beamConeOpacity=0.1410`
   - `Night Glide`: `beamIntensity=1339.280`, `beamConeOpacity=0.0793`
   - `Strobe Core`: `strobePeakIntensity=6528.385`, `activeStrobes=4`, `exposure=0.4977`
+  - moon metrics stay stable: `moonAltitudeDeg≈15.9`, `moonReflectionStrength≈0.24`
   - debug state reflects `sectionOverride` for all three captures

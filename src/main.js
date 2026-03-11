@@ -215,7 +215,13 @@ scene.add(moonVisual);
 
 const moonDisk = new THREE.Mesh(
   new THREE.SphereGeometry(1.95, 28, 20),
-  new THREE.MeshBasicMaterial({ color: 0xd8ecff, depthTest: false }),
+  new THREE.MeshBasicMaterial({
+    color: 0xd8ecff,
+    depthTest: false,
+    transparent: true,
+    opacity: 0.94,
+    toneMapped: false,
+  }),
 );
 moonDisk.renderOrder = 90;
 moonVisual.add(moonDisk);
@@ -2370,6 +2376,7 @@ const clocktowerControllerCtx = {
   rim,
   moon,
   moonVisual,
+  moonDisk,
   moonHalo,
   moonReflection,
   moonReflectionWide,
