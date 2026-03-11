@@ -17,6 +17,34 @@ Upgrade the demoscene from stylized lighting toward a more principled physically
 - Effects should remain tunable for art direction, but the base model should be physically coherent.
 - Every lighting stage needs headless validation cases with screenshots and debug dumps.
 
+## Current Assessment
+
+The current implementation is physically motivated, not physically accurate.
+
+What is already in place:
+
+- a shared lighting state derived from orbital simulation
+- air-mass-based extinction and apparent star color shifts
+- a lightweight Rayleigh/Mie-inspired surface sky shader
+- separation between visible star discs and direct scene lighting
+- automated headless lighting regression coverage
+
+What remains materially non-physical:
+
+- sky color is still driven mostly by artist-chosen day/night/twilight palette lerps rather than atmosphere-derived radiance
+- "photometric" quantities are normalized heuristics, not consistent light units
+- scattering is a local shader approximation, not optical-depth integration through an atmosphere
+- star discs and halos are billboards with hand-tuned scales and intensities
+- ocean response is still effect-driven rather than a proper Fresnel + rough-surface BRDF
+- non-celestial fill/ambient paths still exist in the renderer and complicate physical reasoning
+
+This roadmap therefore distinguishes between:
+
+- physically plausible: coherent enough to reason about, with principled approximations
+- physically rigorous: closer to radiometric and atmospheric correctness
+
+The target for this project should be physically plausible by default, with selected rigorous pieces where the visual payoff is high.
+
 ## Phase 1: Photometric Cleanup
 
 ### 1. Normalize light units and emissive sources
@@ -31,6 +59,12 @@ Upgrade the demoscene from stylized lighting toward a more principled physically
   - volumetric scattering contribution
   - direct scene illumination
 - Stop using the same scalar for both “looks bright on screen” and “lights the world”.
+- Status:
+  - partially implemented
+  - the code now separates several of these paths, but the values are still normalized artistic weights rather than consistent radiometric units
+- Next correction:
+  - define one internal lighting scale for stellar irradiance at the observer and derive downstream terms from that instead of independent constants
+  - ensure bloom/exposure are downstream display controls, not upstream light energy knobs
 
 ### 2. Build a shared lighting state object
 
@@ -42,6 +76,14 @@ Upgrade the demoscene from stylized lighting toward a more principled physically
   - ambient sky contribution
   - water reflection weighting
 - Make all scenes consume this instead of ad hoc per-scene formulas.
+- Status:
+  - implemented for the binary scenes
+- Remaining gap:
+  - extend shared ownership to the rest of the renderer so scene-local and global fill lights do not bypass the lighting model
+  - split the lighting state into:
+    - simulation-space source radiometry
+    - atmospheric transport
+    - camera/display response
 
 ## Phase 2: Atmospheric Scattering
 
@@ -60,6 +102,13 @@ Upgrade the demoscene from stylized lighting toward a more principled physically
   - warm low-angle sunlight at sunrise/sunset
   - smooth twilight rolloff
   - second star contribution layered physically, not just color-added
+- Status:
+  - implemented as a lightweight approximation
+- Current limitation:
+  - the shader still blends between fixed sky palettes; the atmosphere does not yet emerge from integrated optical depth
+- Next correction:
+  - move from palette-driven sky color to atmosphere-derived radiance
+  - compute scattering from extinction coefficients, density falloff, and per-star transmittance along the view ray
 
 ### 4. Add atmospheric extinction for sun discs
 
@@ -68,6 +117,13 @@ Upgrade the demoscene from stylized lighting toward a more principled physically
   - stars dim and warm near horizon
   - secondary star can appear cooler and weaker
   - noon discs tighten and stop blooming excessively
+- Status:
+  - implemented in a first-order form
+- Current limitation:
+  - extinction is RGB-exp(-k * airMass) with hand-chosen coefficients, and disc size/halo shape are still artist-tuned billboards
+- Next correction:
+  - move to coarse wavelength-bucket extinction
+  - derive disc angular size, halo spread, and bloom contribution from source size plus atmospheric scattering rather than independent heuristics
 
 ## Phase 3: Volumetrics
 
@@ -77,6 +133,8 @@ Upgrade the demoscene from stylized lighting toward a more principled physically
   - ocean horizon fades into atmosphere
   - distant clocktower skyline picks up haze
   - external scene gains depth without muddying orbit readability
+- Why this matters now:
+  - the current sky can read plausibly, but the scene volume itself is still thin; horizon depth and distance cues are not yet governed by the same atmosphere model
 
 ### 6. Add volumetric light shafts for strong emitters
 
@@ -104,6 +162,10 @@ Upgrade the demoscene from stylized lighting toward a more principled physically
   - sunrise/sunset reflection trails elongate naturally
   - midday specular does not become a white slab
   - moonlight reflection remains diffuse and readable
+- Priority note:
+  - this is likely the largest visual payoff remaining in the planet POV
+- Current limitation:
+  - the current `Water`-based approach and reflection planes remain heuristic and are the biggest source of non-physical appearance
 
 ### 8. Add shoreline / near-surface scattering cues
 
@@ -126,9 +188,29 @@ Upgrade the demoscene from stylized lighting toward a more principled physically
 - ocean reflection derived from geometry
 - low-level fill light on the clocktower scene
 
+## Cross-Cutting Cleanup
+
+### 11. Remove or isolate non-celestial lighting shortcuts
+
+- Audit ambient, hemisphere, fill, rim, and other helper lights scene by scene.
+- In the planetary surface view:
+  - stars should be the only primary light sources
+  - any remaining fill should be explicitly modeled as atmospheric or ocean bounce, not hidden helper light
+- In the clocktower view:
+  - separate physically motivated moon/sky lighting from stylized performance lighting
+
+### 12. Separate transport from display response
+
+- Treat these as different layers:
+  - source radiance / irradiance
+  - atmospheric transport
+  - surface BRDF response
+  - camera/display response
+- ACES, bloom, and exposure should shape presentation after the physical lighting state is computed, not substitute for it.
+
 ## Phase 6: Validation
 
-### 11. Extend headless validation matrix
+### 13. Extend headless validation matrix
 
 - Add lighting-specific captures:
   - surface sunrise
@@ -143,34 +225,53 @@ Upgrade the demoscene from stylized lighting toward a more principled physically
   - direct light intensity
   - ambient sky intensity
   - water reflection gain
+- Extend the debug dump further to include:
+  - per-star transmittance
+  - apparent star chromaticity / color temperature proxy
+  - sun angular size / halo parameters
+  - surface Fresnel and reflection weighting
+  - active non-celestial light contributions by scene
 
-### 12. Add acceptance criteria
+### 14. Add acceptance criteria
 
 - Sunrise and sunset clearly read without manual explanation.
 - Noon remains bright but not blown out.
 - Volumetric beams are visible only when justified by angle and haze.
 - External view remains readable: stars, planets, and orbits stay distinguishable.
 - Headless captures remain stable across presets.
+- Additional physical-plausibility criteria:
+  - sky hue shifts emerge from extinction/scattering changes rather than palette jumps
+  - the planet surface scene is explainable in terms of star geometry alone
+  - water highlights narrow and broaden with view/light geometry, not just preset-dependent scalar tweaks
+  - disabling helper lights does not collapse the binary surface scene
 
 ## Recommended Implementation Order
 
+Completed:
+
 1. Shared lighting state
-2. Surface atmospheric scattering
-3. Sun-disc extinction and tonemapping cleanup
-4. Water BRDF/reflection cleanup
-5. Volumetric aerial perspective
-6. Spotlight/strobe volumetrics
-7. Moon as physical light source
-8. Expand headless validation matrix
+2. Surface atmospheric scattering approximation
+3. First-order sun-disc extinction and tonemapping cleanup
+
+Next:
+
+4. Remove or isolate non-celestial lighting shortcuts
+5. Water BRDF/reflection cleanup
+6. Volumetric aerial perspective
+7. Spotlight/strobe volumetrics
+8. Moon as physical light source
+9. Expand headless validation matrix and physical debug fields
 
 ## Risks
 
 - Full volumetrics can be too expensive for real-time if done naively.
 - Physically correct values can look “less demoscene” unless art-direction controls remain available.
 - Multi-star scattering can easily become unreadable without careful weighting and exposure control.
+- A fully rigorous spectral atmosphere model may not justify its complexity here; the better tradeoff is a disciplined physically plausible model with explicit approximations.
 
 ## Success Criteria
 
 - The surface scene reads as a coherent planetary atmosphere rather than a sky gradient plus sprites.
 - The clocktower scene gains believable beams and moonlight without losing the neon demoscene identity.
 - All major lighting states are reproducible through presets and headless captures.
+- The remaining approximations are named, localized, and measurable rather than spread across scene-specific hacks.

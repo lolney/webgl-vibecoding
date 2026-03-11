@@ -47,6 +47,20 @@ export const binaryPresets = [
     },
   },
   {
+    key: "surface-sunset",
+    scene: "binarySurface",
+    label: "Surface // Sunset",
+    state: {
+      binaryDayHours: 18.0,
+      simulationDays: 97.0,
+      latitudeDeg: 0,
+      longitudeDeg: 0,
+      multiplier: 1,
+      cinematic: true,
+      surfacePitch: 0.3,
+    },
+  },
+  {
     key: "surface-night",
     scene: "binarySurface",
     label: "Surface // Night",

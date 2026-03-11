@@ -1,70 +1,43 @@
-# TODO
+- [x] Lighting roadmap step 1: build a shared lighting state derived from orbital simulation
+- [x] Lighting roadmap step 2: replace the surface sky gradient with a scattering approximation
+- [x] Lighting roadmap step 3: add sun-disc extinction and tonemapping cleanup
+- [x] Validate roadmap steps 1-3 with automated headless lighting regression coverage
 
-## Priority 1
+- [] Lighting roadmap outline:
+  - [] Phase 1: photometric cleanup
+    - [x] Shared lighting state for binary scenes
+    - [~] Normalize light units and emissive source roles
+  - [] Phase 2: atmospheric scattering
+    - [x] Surface scattering approximation
+    - [x] First-order sun-disc extinction
+    - [] Move from palette-driven sky color to atmosphere-derived radiance
+    - [] Upgrade extinction from RGB heuristics to coarse wavelength-bucket modeling
+  - [] Cross-cutting cleanup
+    - [] Remove or isolate non-celestial helper lights in the planet scene
+    - [] Separate source radiometry, atmospheric transport, surface response, and display response
+  - [] Phase 3: volumetrics
+    - [] Add volumetric aerial perspective
+    - [] Add physically directional light shafts for strong emitters
+  - [] Phase 4: water and surface BRDF
+    - [] Replace heuristic ocean reflections with Fresnel + rough-surface response
+    - [] Add shoreline and near-surface scattering cues
+  - [] Phase 5: clocktower PBR lighting
+    - [] Make spotlights and strobes more physically grounded
+    - [] Rework the moon as a proper celestial light source
+  - [] Phase 6: validation
+    - [x] Lighting-specific headless regression coverage for key surface presets
+    - [] Extend debug dumps with transport, transmittance, and reflection metrics
+    - [] Add physical-plausibility acceptance checks
+  - [] See `docs/lighting-roadmap.md` for detail and rationale
 
-- [x] Stabilize the `binarySurface` composition
-  - Default surface framing now boots into a constrained, horizon-stable view.
-  - Scene presets provide intentionally framed surface moments instead of arbitrary camera states.
-
-- [x] Fix remaining surface-water artifacts
-  - Reduced daytime specular blast and reflection-strip intensity.
-  - Surface water now tracks the clocktower water setup more closely while keeping the POV stable.
-
-- [x] Tighten sun disc rendering
-  - Reduced midday blowout and separated disc/halo balance.
-  - Surface presets now keep the meaningful star event in frame.
-
-- [x] Clean scene-specific HUD behavior
-  - Scene-specific labels now distinguish `Free Orbit`, `Free Look`, `Sun Track`, and `System View`.
-  - Preset chooser and time-rate controls are only shown where they make sense.
-
-## Priority 2
-
-- [x] Make the planet POV physically legible
-  - Strengthened atmosphere/fog separation between night, twilight, and day.
-  - Added stable presets for sunrise, high day, second-sun event, and night.
-
-- [x] Improve the orbital schematic accuracy/readability
-  - Added explicit `A/B/P` labels and altitude readouts.
-  - Viewer/solar vectors continue to derive from shared orbital state.
-
-- [x] Strengthen headless regression coverage
-  - Added debug JSON sidecars for every headless capture.
-  - Added `npm run headless:matrix` to sweep all key presets/scenes.
-
-- [x] Refactor simulation ownership
-  - Added shared binary state/preset/url helpers in `src/scenes/shared/binaryState.js`.
-  - Runtime scene state now resolves through shared preset/time-multiplier helpers instead of ad hoc logic.
-
-## Priority 3
-
-- [x] Improve the external binary-system scene
-  - External presets now support deterministic camera setups.
-  - Volumetric star presentation and orbit readability remain clear in headless captures.
-
-- [x] Upgrade cinematic camera behavior
-  - Planet POV sun-track remains viewer-position invariant.
-  - External cinematic orbit now follows a more deliberate authored path.
-
-- [x] Add scene-local presets
-  - Added surface and external presets with shared state definitions.
-  - Presets are selectable in the HUD and reproducible via URL params/headless mode.
-
-- [x] Make URL/state syncing complete
-  - Scene, preset, time, lat/lon, multiplier, cinematic mode, and diagnostics visibility now sync through the URL.
-
-## Priority 4
-
-- [x] Push the surface rendering toward a more credible atmosphere model
-  - Reduced daytime exposure and bloom while improving horizon haze separation.
-  - Primary/secondary stars retain distinct color temperatures.
-
-- [x] Add a proper starfield/background pipeline
-  - Added colored distant stars plus a subtle rotating nebula shell for large-scale ambience.
-
-- [x] Improve audio-reactive integration
-  - Existing audio modulation remains subtle and focused on bloom/CRT treatment rather than destabilizing the simulation.
-
-- [x] Build a proper scene architecture
-  - Added shared primitives for diagnostics and binary preset/state management.
-  - Scene/runtime concerns are more cleanly separated from UI state plumbing.
+- [] Latitude setting in planet POV mode:
+  - The upper-left globe view should act like a wheel control: clicking dragging should shift the viewer's position clockwise or counter clockwise around the globe
+  - Intuitively: the viewer should move north or south along its current line of longitude (until reaching the north/south poles, at which point the viewer is heading in the opposite orientation). In screen space, the viewer should stay at the same location; the globe should move.
+  - From a starting position at the equator: clicking and dragging up should spin the globe up, moving the viewer closer to the south pole. Clicking and dragging down should move toward the north pole. 
+  - We should support arbitrary latitudes (including 90 N and S)
+  - We should smoothly wrap from 89 N (western hemisphere) -> 89 N (eastern hemisphere), etc.
+  - We should smoothly update the position of the suns in the sky
+  - Time should continue progressing smoothly (assume that it represents UTC; time zone independent)
+  - The viewer vector should be correctly updated in all schematics. 
+  - The viewer should maintain the same orientation relative to the horizon.
+- [] Add latitude labels (0, 30N/S, 60N/S, 90N/S) on the globe. 

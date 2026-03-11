@@ -561,11 +561,23 @@ const surfaceSky = new THREE.Mesh(
   new THREE.ShaderMaterial({
     side: THREE.BackSide,
     uniforms: {
-      uDay: { value: 0.2 },
-      uTwilight: { value: 0.0 },
-      uSecond: { value: 0.0 },
-      uA: { value: new THREE.Vector3(0, 1, 0) },
-      uB: { value: new THREE.Vector3(0, 1, 0) },
+      uZenithColor: { value: new THREE.Color(0x2d69b8) },
+      uHorizonColor: { value: new THREE.Color(0x95b7e5) },
+      uNightZenith: { value: new THREE.Color(0x020712) },
+      uNightHorizon: { value: new THREE.Color(0x081428) },
+      uRayleighColor: { value: new THREE.Color(0x77b6ff) },
+      uMieColorA: { value: new THREE.Color(0xffc07a) },
+      uMieColorB: { value: new THREE.Color(0xa9c8ff) },
+      uSunDirA: { value: new THREE.Vector3(0, 1, 0) },
+      uSunDirB: { value: new THREE.Vector3(0, 1, 0) },
+      uDayStrength: { value: 0.2 },
+      uTwilightStrength: { value: 0.0 },
+      uNightStrength: { value: 1.0 },
+      uHaze: { value: 0.2 },
+      uScatterStrengthA: { value: 0.0 },
+      uScatterStrengthB: { value: 0.0 },
+      uMieStrengthA: { value: 0.0 },
+      uMieStrengthB: { value: 0.0 },
     },
     vertexShader: `
       varying vec3 vLocalDir;
@@ -576,30 +588,52 @@ const surfaceSky = new THREE.Mesh(
       }
     `,
     fragmentShader: `
-      uniform float uDay;
-      uniform float uTwilight;
-      uniform float uSecond;
-      uniform vec3 uA;
-      uniform vec3 uB;
+      uniform vec3 uZenithColor;
+      uniform vec3 uHorizonColor;
+      uniform vec3 uNightZenith;
+      uniform vec3 uNightHorizon;
+      uniform vec3 uRayleighColor;
+      uniform vec3 uMieColorA;
+      uniform vec3 uMieColorB;
+      uniform vec3 uSunDirA;
+      uniform vec3 uSunDirB;
+      uniform float uDayStrength;
+      uniform float uTwilightStrength;
+      uniform float uNightStrength;
+      uniform float uHaze;
+      uniform float uScatterStrengthA;
+      uniform float uScatterStrengthB;
+      uniform float uMieStrengthA;
+      uniform float uMieStrengthB;
       varying vec3 vLocalDir;
       void main() {
         vec3 dir = normalize(vLocalDir);
         float h = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
-        vec3 nightTop = vec3(0.003, 0.009, 0.03);
-        vec3 nightHorizon = vec3(0.016, 0.026, 0.06);
-        vec3 twiTop = vec3(0.07, 0.11, 0.24);
-        vec3 twiHorizon = vec3(0.45, 0.24, 0.16);
-        vec3 dayTop = vec3(0.11, 0.33, 0.66);
-        vec3 dayHorizon = vec3(0.21, 0.29, 0.42);
-        vec3 nightCol = mix(nightHorizon, nightTop, h);
-        vec3 twiCol = mix(twiHorizon, twiTop, h);
-        vec3 dayCol = mix(dayHorizon, dayTop, h);
-        vec3 base = mix(mix(nightCol, twiCol, uTwilight), dayCol, uDay);
-        float horizonBand = smoothstep(0.01, 0.2, h) * (1.0 - smoothstep(0.2, 0.38, h));
+        float muA = max(dot(dir, normalize(uSunDirA)), 0.0);
+        float muB = max(dot(dir, normalize(uSunDirB)), 0.0);
+        float rayleighPhaseA = 0.75 * (1.0 + muA * muA);
+        float rayleighPhaseB = 0.75 * (1.0 + muB * muB);
+        float miePhaseA = pow(muA, mix(10.0, 28.0, 1.0 - uHaze));
+        float miePhaseB = pow(muB, mix(12.0, 26.0, 1.0 - uHaze));
+        float horizon = pow(1.0 - h, 1.4);
+        float density = mix(1.05, 2.5, horizon) * mix(0.75, 1.45, uHaze);
+
+        vec3 nightBase = mix(uNightHorizon, uNightZenith, pow(h, 0.72));
+        vec3 dayBase = mix(uHorizonColor, uZenithColor, pow(h, 0.7));
+        vec3 scatter = uRayleighColor * (
+          rayleighPhaseA * uScatterStrengthA +
+          rayleighPhaseB * uScatterStrengthB
+        ) * density * (0.45 + 0.55 * h);
+        vec3 mie = uMieColorA * miePhaseA * uMieStrengthA
+          + uMieColorB * miePhaseB * uMieStrengthB;
+        vec3 twilightBoost = uHorizonColor * horizon * (uTwilightStrength * 0.46);
         float waterlineBand = smoothstep(0.0, 0.05, h) * (1.0 - smoothstep(0.05, 0.14, h));
-        base *= 1.0 - waterlineBand * 0.28;
-        base += vec3(1.0, 0.46, 0.22) * horizonBand * uTwilight * 0.22;
-        gl_FragColor = vec4(base, 1.0);
+
+        vec3 litSky = dayBase + scatter + mie + twilightBoost;
+        vec3 col = mix(nightBase, litSky, clamp(uDayStrength + uTwilightStrength * 0.72, 0.0, 1.0));
+        col *= 1.0 - waterlineBand * 0.24;
+        col = mix(col, nightBase, uNightStrength * smoothstep(0.0, 0.35, 1.0 - h) * 0.18);
+        gl_FragColor = vec4(col, 1.0);
       }
     `,
   }),
@@ -637,6 +671,7 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
       toneMapped: false,
       uniforms: {
         uColor: { value: new THREE.Color(coreColor) },
+        uIntensity: { value: 1.0 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -647,6 +682,7 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
       `,
       fragmentShader: `
         uniform vec3 uColor;
+        uniform float uIntensity;
         varying vec2 vUv;
         void main() {
           vec2 p = vUv - 0.5;
@@ -654,7 +690,7 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
           float disc = smoothstep(0.5, 0.0, d);
           float edge = smoothstep(0.5, 0.42, d) * 0.22;
           float a = clamp(disc + edge, 0.0, 1.0);
-          gl_FragColor = vec4(uColor * (disc * 1.15 + edge), a);
+          gl_FragColor = vec4(uColor * (disc * 1.15 + edge) * uIntensity, a);
         }
       `,
     }),
@@ -672,6 +708,7 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
       uniforms: {
         uColor: { value: new THREE.Color(glowColor) },
         uStrength: { value: 1.0 },
+        uIntensity: { value: 1.0 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -683,6 +720,7 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
       fragmentShader: `
         uniform vec3 uColor;
         uniform float uStrength;
+        uniform float uIntensity;
         varying vec2 vUv;
         void main() {
           vec2 p = vUv - 0.5;
@@ -690,7 +728,7 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
           float core = smoothstep(0.18, 0.0, d);
           float halo = smoothstep(0.52, 0.0, d) * 0.7;
           float a = (core + halo) * uStrength;
-          gl_FragColor = vec4(uColor * (core * 1.4 + halo), a);
+          gl_FragColor = vec4(uColor * (core * 1.4 + halo) * uIntensity, a);
         }
       `,
     }),
@@ -2305,6 +2343,12 @@ function tick() {
     sceneDebug.secondaryAltitudeDeg !== undefined
       ? `sun B alt ${sceneDebug.secondaryAltitudeDeg.toFixed(1)} az ${sceneDebug.secondaryAzimuthDeg.toFixed(1)}`
       : "sun B alt --.- az --.-",
+    sceneDebug.lighting
+      ? `airmass A ${sceneDebug.lighting.primaryAirMass.toFixed(2)} B ${sceneDebug.lighting.secondaryAirMass.toFixed(2)}`
+      : "airmass A --.-- B --.--",
+    sceneDebug.lighting
+      ? `exposure ${sceneDebug.lighting.exposure.toFixed(3)} haze ${sceneDebug.lighting.hazeFactor.toFixed(3)}`
+      : "exposure --.--- haze --.---",
   ] : []);
 
   window.__demoState.frames += 1;

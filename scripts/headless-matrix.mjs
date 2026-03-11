@@ -10,6 +10,7 @@ const cases = [
   ["--scene=binaryExternal", "--preset=external-conjunction", "--name=matrix-external-conjunction"],
   ["--scene=binarySurface", "--preset=surface-sunrise", "--name=matrix-surface-sunrise"],
   ["--scene=binarySurface", "--preset=surface-noon", "--name=matrix-surface-noon"],
+  ["--scene=binarySurface", "--preset=surface-sunset", "--name=matrix-surface-sunset"],
   ["--scene=binarySurface", "--preset=surface-second-sun", "--name=matrix-surface-second-sun"],
   ["--scene=binarySurface", "--preset=surface-night", "--name=matrix-surface-night"],
 ];

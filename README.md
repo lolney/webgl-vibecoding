@@ -66,6 +66,22 @@ Runs a fixed regression sweep across the major scenes and presets:
 npm run headless:matrix
 ```
 
+## Headless lighting regression
+
+Runs the lighting-specific regression sweep for the binary surface scene. This validates the new shared lighting state, scattering pass, and sun-disc extinction/tonemapping behavior across canonical presets.
+
+```bash
+npm run headless:lighting
+```
+
+Cases covered:
+
+- `surface-sunrise`
+- `surface-noon`
+- `surface-sunset`
+- `surface-second-sun`
+- `surface-night`
+
 Examples:
 
 ```bash

@@ -8,6 +8,7 @@ Validate critical behaviors for:
 - Clocktower scene controls
 - Binary external scene readability + UI
 - Binary surface POV physical consistency + schematic correctness
+- Binary surface lighting model and extinction behavior
 - Sun-track camera behavior
 - Shared preset/url reproducibility
 - Headless debug sidecar output
@@ -94,6 +95,18 @@ Validate critical behaviors for:
   - `output/test-debug-dump-debug.json` exists
   - dump includes scene, preset, camera, time, and solar-altitude state
 
+11. Lighting regression remains stable across canonical surface presets
+- Command:
+  - `npm run headless:lighting`
+- Expected:
+  - all five presets render successfully
+  - debug sidecars include `lighting.*` fields
+  - sunrise air mass is substantially higher than noon
+  - noon direct illuminance exceeds sunrise and night
+  - sunset keeps the primary star near the horizon
+  - second-sun preset keeps the primary below horizon and secondary above it
+  - night daylight factor is near zero and exposure remains below noon
+
 ## Results
 
 1. Clocktower hides time badge: `PASS`
@@ -151,3 +164,12 @@ Validate critical behaviors for:
 10. Debug sidecar output: `PASS`
 - Evidence (`output/*-debug.json`):
   - each headless render now writes a JSON dump containing `scene`, `activePresetKey`, `cameraPos`, `cameraTarget`, `binaryDayHours`, and solar-altitude fields where applicable
+
+11. Lighting regression: `PASS`
+- Evidence (`npm run headless:lighting`, `output/lighting-*.png`, `output/lighting-*-debug.json`):
+  - sunrise: `primaryAirMass=36.467`, `secondaryAirMass=2.374`, `hazeFactor=0.4332`
+  - noon: `primaryAirMass=1.181`, `primaryDirectIlluminance=0.7698`, `exposure=0.48`
+  - sunset: `primaryAltitudeDeg≈0`, `twilightFactor=0.2631`, `hazeFactor=0.6208`
+  - second sun: `primaryAltitudeDeg=-2.02`, `secondaryAltitudeDeg=13.88`
+  - night: `daylightFactor=0`, `exposure=0.29`
+  - regression script completed with `Lighting regression OK.`
