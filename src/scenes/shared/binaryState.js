@@ -128,11 +128,36 @@ export function readBinaryUrlState(query) {
   };
 }
 
+export function normalizeObserverCoordinates(latitudeDeg = 0, longitudeDeg = 0) {
+  let lat = Number.isFinite(latitudeDeg) ? latitudeDeg : 0;
+  let lon = Number.isFinite(longitudeDeg) ? longitudeDeg : 0;
+
+  while (lat > 90) {
+    lat = 180 - lat;
+    lon += 180;
+  }
+  while (lat < -90) {
+    lat = -180 - lat;
+    lon += 180;
+  }
+
+  lon = THREE.MathUtils.euclideanModulo(lon + 180, 360) - 180;
+
+  if (Math.abs(lat) < 1e-6) lat = 0;
+  if (Math.abs(lon) < 1e-6) lon = 0;
+
+  return { latitudeDeg: lat, longitudeDeg: lon };
+}
+
 export function resolveInitialBinaryState(urlState) {
   const preset = findBinaryPreset(urlState.preset);
   const presetState = preset?.state || {};
   const rawHour = urlState.binaryHour ?? presetState.binaryDayHours ?? binaryDefaultStartHour;
   const binaryDayHours = THREE.MathUtils.euclideanModulo(rawHour, 24);
+  const observerCoords = normalizeObserverCoordinates(
+    urlState.binaryLat ?? presetState.latitudeDeg ?? 0,
+    urlState.binaryLon ?? presetState.longitudeDeg ?? 0,
+  );
   return {
     presetKey: preset?.key || "",
     binaryDayHours,
@@ -141,8 +166,8 @@ export function resolveInitialBinaryState(urlState) {
       : (presetState.simulationDays ?? binaryDefaultSimulationDays),
     binaryHourRateBase: urlState.binaryHourRate ?? 0.12,
     binaryTimeMultiplier: coerceTimeMultiplier(urlState.timeMultiplier ?? presetState.multiplier ?? 1),
-    observerLatitudeDeg: urlState.binaryLat ?? presetState.latitudeDeg ?? 0,
-    observerLongitudeDeg: urlState.binaryLon ?? presetState.longitudeDeg ?? 0,
+    observerLatitudeDeg: observerCoords.latitudeDeg,
+    observerLongitudeDeg: observerCoords.longitudeDeg,
     cinematic: urlState.cinematic || Boolean(presetState.cinematic),
     diagnosticsVisible: urlState.diagnostics,
     scene: urlState.scene || preset?.scene || "clocktower",

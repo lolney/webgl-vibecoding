@@ -28,6 +28,7 @@ import {
   buildUrlFromState,
   coerceTimeMultiplier,
   getPresetsForScene,
+  normalizeObserverCoordinates,
   readBinaryUrlState,
   resolveInitialBinaryState,
 } from "./scenes/shared/binaryState.js";
@@ -37,7 +38,12 @@ const audioButton = document.getElementById("audioToggle");
 const hud = createHudPrimitive();
 const diagnosticsPanel = createDiagnosticsPanel();
 const orbitSchematic = createOrbitSchematic();
-const viewerSchematic = createViewerSchematic();
+const viewerSchematic = createViewerSchematic({
+  onLatitudeAdjust(deltaDeg) {
+    adjustObserverLatitude(deltaDeg, { syncUrl: true });
+    markInteraction();
+  },
+});
 const {
   sceneChooser,
   presetChooser,
@@ -1566,7 +1572,7 @@ let binaryDayHours = resolvedInitialBinaryState.binaryDayHours;
 let binarySimulationDays = resolvedInitialBinaryState.binarySimulationDays;
 let binaryHourRateBase = resolvedInitialBinaryState.binaryHourRateBase;
 let binaryTimeMultiplier = resolvedInitialBinaryState.binaryTimeMultiplier;
-let observerLatitudeDeg = THREE.MathUtils.clamp(resolvedInitialBinaryState.observerLatitudeDeg, -85, 85);
+let observerLatitudeDeg = resolvedInitialBinaryState.observerLatitudeDeg;
 let observerLongitudeDeg = resolvedInitialBinaryState.observerLongitudeDeg;
 let diagnosticsVisible = resolvedInitialBinaryState.diagnosticsVisible || debugView;
 let pendingInitialOrbitView = resolvedInitialBinaryState.orbitView;
@@ -1590,6 +1596,27 @@ function wrapAngle(angle) {
 
 function lerpAngle(from, to, t) {
   return from + wrapAngle(to - from) * t;
+}
+
+function applyObserverCoordinates(latitudeDeg, longitudeDeg) {
+  const nextCoords = normalizeObserverCoordinates(latitudeDeg, longitudeDeg);
+  observerLatitudeDeg = nextCoords.latitudeDeg;
+  observerLongitudeDeg = nextCoords.longitudeDeg;
+  return nextCoords;
+}
+
+function setObserverCoordinates(latitudeDeg, longitudeDeg, options = {}) {
+  const { syncUrl = false, pushHistory = false } = options;
+  activePresetKey = "";
+  hud.setPreset("");
+  applyObserverCoordinates(latitudeDeg, longitudeDeg);
+  if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
+  if (syncUrl) syncSceneToUrl(activeSceneKey, { pushHistory });
+}
+
+function adjustObserverLatitude(deltaDeg, options = {}) {
+  if (!Number.isFinite(deltaDeg) || deltaDeg === 0) return;
+  setObserverCoordinates(observerLatitudeDeg + deltaDeg, observerLongitudeDeg, options);
 }
 
 function getSurfaceObserverState() {
@@ -1700,10 +1727,12 @@ function applyBinaryPreset(presetKey, options = {}) {
     binarySimulationDays = preset.state.simulationDays;
   }
   if (Number.isFinite(preset.state.latitudeDeg)) {
-    observerLatitudeDeg = THREE.MathUtils.clamp(preset.state.latitudeDeg, -85, 85);
-  }
-  if (Number.isFinite(preset.state.longitudeDeg)) {
-    observerLongitudeDeg = preset.state.longitudeDeg;
+    applyObserverCoordinates(
+      preset.state.latitudeDeg,
+      Number.isFinite(preset.state.longitudeDeg) ? preset.state.longitudeDeg : observerLongitudeDeg,
+    );
+  } else if (Number.isFinite(preset.state.longitudeDeg)) {
+    applyObserverCoordinates(observerLatitudeDeg, preset.state.longitudeDeg);
   }
   if (Number.isFinite(preset.state.multiplier)) {
     setBinaryTimeMultiplier(preset.state.multiplier);
@@ -2169,8 +2198,7 @@ window.addEventListener("popstate", () => {
   binaryDayHours = nextState.binaryDayHours;
   binarySimulationDays = nextState.binarySimulationDays;
   binaryHourRateBase = nextState.binaryHourRateBase;
-  observerLatitudeDeg = THREE.MathUtils.clamp(nextState.observerLatitudeDeg, -85, 85);
-  observerLongitudeDeg = nextState.observerLongitudeDeg;
+  applyObserverCoordinates(nextState.observerLatitudeDeg, nextState.observerLongitudeDeg);
   binaryTimeMultiplier = nextState.binaryTimeMultiplier;
   diagnosticsVisible = nextState.diagnosticsVisible || debugView;
   applySceneMode(sceneByKey[nextState.scene] ? nextState.scene : "clocktower", { syncUrl: false });
@@ -2191,18 +2219,12 @@ window.__getBinaryTime = () => binaryDayHours;
 window.__getBinarySimulationDays = () => binarySimulationDays;
 window.__setObserverLatitude = (latDeg) => {
   if (!Number.isFinite(latDeg)) return;
-  activePresetKey = "";
-  hud.setPreset("");
-  observerLatitudeDeg = THREE.MathUtils.clamp(latDeg, -85, 85);
-  if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
+  setObserverCoordinates(latDeg, observerLongitudeDeg);
 };
 window.__getObserverLatitude = () => observerLatitudeDeg;
 window.__setObserverLongitude = (lonDeg) => {
   if (!Number.isFinite(lonDeg)) return;
-  activePresetKey = "";
-  hud.setPreset("");
-  observerLongitudeDeg = lonDeg;
-  if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
+  setObserverCoordinates(observerLatitudeDeg, lonDeg);
 };
 window.__getObserverLongitude = () => observerLongitudeDeg;
 window.__setTimeMultiplier = (mult) => {

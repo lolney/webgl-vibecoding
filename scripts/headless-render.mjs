@@ -36,6 +36,8 @@ const distance = readNumberArg("distance");
 const targetX = readNumberArg("target-x");
 const targetY = readNumberArg("target-y");
 const targetZ = readNumberArg("target-z");
+const viewerDragX = readNumberArg("viewer-drag-x");
+const viewerDragY = readNumberArg("viewer-drag-y");
 const sweepAzimuthRaw = getArg("sweep-azimuth");
 const waitMs = Math.max(100, readNumberArg("wait-ms") ?? 1800);
 const outputName = getArg("name");
@@ -185,6 +187,25 @@ try {
         window.__setAudioDrive(nextDrive);
       }
     }, { beat, level });
+  }
+  if (viewerDragX !== null || viewerDragY !== null) {
+    const viewerCanvas = page.locator("#viewerSchematicCanvas");
+    await viewerCanvas.waitFor({ state: "visible", timeout: 4000 });
+    const bounds = await viewerCanvas.boundingBox();
+    if (!bounds) {
+      throw new Error("Viewer schematic canvas is not available for drag input");
+    }
+    const startX = bounds.x + bounds.width * 0.52;
+    const startY = bounds.y + bounds.height * 0.52;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(
+      startX + (viewerDragX ?? 0),
+      startY + (viewerDragY ?? 0),
+      { steps: 18 },
+    );
+    await page.mouse.up();
+    await page.waitForTimeout(350);
   }
   await page.waitForTimeout(waitMs);
   const outputs = [];

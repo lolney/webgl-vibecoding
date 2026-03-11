@@ -8,6 +8,7 @@
     "headless:matrix": "npm run build && node scripts/headless-matrix.mjs",
     "headless:lighting": "npm run build && node scripts/headless-lighting-regression.mjs",
     "headless:clocktower-lighting": "npm run build && node scripts/headless-clocktower-lighting.mjs",
+    "headless:latitude": "npm run build && node scripts/headless-latitude-regression.mjs",
     "headless:debug": "npm run build && node scripts/headless-render.mjs --debug",
     "dev": "vite",
     "build": "vite build",

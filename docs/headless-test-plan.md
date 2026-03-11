@@ -117,6 +117,16 @@ Validate critical behaviors for:
   - `Strobe Core` exposure compresses below `Hyper Lift`
   - moon remains above the horizon and produces a visible reflection response
 
+13. Latitude wheel interaction and pole wrapping remain stable
+- Command:
+  - `npm run headless:latitude`
+- Expected:
+  - dragging the upper-left globe upward from the equator moves the observer south while keeping longitude stable
+  - simulation time keeps advancing during the drag
+  - pole crossing normalizes latitude into `[-90, 90]` and flips longitude by `180` degrees
+  - the viewer heading remains stable relative to the local horizon
+  - a small main-canvas drag changes viewer heading smoothly instead of jumping
+
 ## Results
 
 1. Clocktower hides time badge: `PASS`
@@ -191,3 +201,11 @@ Validate critical behaviors for:
   - `Strobe Core`: `strobePeakIntensity=6528.385`, `activeStrobes=4`, `exposure=0.4977`
   - moon metrics stay stable: `moonAltitudeDeg≈15.9`, `moonReflectionStrength≈0.24`
   - debug state reflects `sectionOverride` for all three captures
+
+13. Latitude wheel interaction and pole wrapping: `PASS`
+- Evidence (`npm run headless:latitude`, `output/latitude-regression-*.png`):
+  - equator drag up moves latitude from `0.0` to `-67.2` while longitude remains `0.0`
+  - `binarySimulationDays` advances from `85.3503` to `85.3640` during the drag
+  - viewer heading remains stable: `viewerTurnYaw=1.6472084003121636` before and after latitude drag
+  - pole normalization maps `lat=120, lon=-25` to `lat=60, lon=155`
+  - a small main-canvas yaw drag changes `viewerTurnYaw` smoothly from `1.6472` to `1.5016`

@@ -3,34 +3,34 @@
 - [x] Lighting roadmap step 3: add sun-disc extinction and tonemapping cleanup
 - [x] Validate roadmap steps 1-3 with automated headless lighting regression coverage
 
-- [] Lighting roadmap outline:
-  - [] Phase 1: photometric cleanup
+- [x] Lighting roadmap outline:
+  - [x] Phase 1: photometric cleanup
     - [x] Shared lighting state for binary scenes
     - [x] Normalize light units and emissive source roles
-  - [] Phase 2: atmospheric scattering
+  - [x] Phase 2: atmospheric scattering
     - [x] Surface scattering approximation
     - [x] First-order sun-disc extinction
     - [x] Move from palette-driven sky color to atmosphere-derived radiance
     - [x] Upgrade extinction from RGB heuristics to coarse wavelength-bucket modeling
-  - [] Cross-cutting cleanup
+  - [x] Cross-cutting cleanup
     - [x] Remove or isolate non-celestial helper lights in the planet scene
     - [x] Separate source radiometry, atmospheric transport, surface response, and display response
-  - [] Phase 3: volumetrics
+  - [x] Phase 3: volumetrics
     - [x] Add volumetric aerial perspective
     - [x] Add physically directional light shafts for strong emitters
-  - [] Phase 4: water and surface BRDF
+  - [x] Phase 4: water and surface BRDF
     - [x] Replace heuristic ocean reflections with Fresnel + rough-surface response
     - [x] Add shoreline and near-surface scattering cues
-  - [] Phase 5: clocktower PBR lighting
+  - [x] Phase 5: clocktower PBR lighting
     - [x] Make spotlights and strobes more physically grounded
     - [x] Rework the moon as a proper celestial light source
-  - [] Phase 6: validation
+  - [x] Phase 6: validation
     - [x] Lighting-specific headless regression coverage for key surface presets
     - [x] Extend debug dumps with transport, transmittance, and reflection metrics
     - [x] Add physical-plausibility acceptance checks
-  - [] See `docs/lighting-roadmap.md` for detail and rationale
+  - [x] See `docs/lighting-roadmap.md` for detail and rationale
 
-- [] Latitude setting in planet POV mode:
+- [x] Latitude setting in planet POV mode:
   - The upper-left globe view should act like a wheel control: clicking dragging should shift the viewer's position clockwise or counter clockwise around the globe
   - Intuitively: the viewer should move north or south along its current line of longitude (until reaching the north/south poles, at which point the viewer is heading in the opposite orientation). In screen space, the viewer should stay at the same location; the globe should move.
   - From a starting position at the equator: clicking and dragging up should spin the globe up, moving the viewer closer to the south pole. Clicking and dragging down should move toward the north pole. 
@@ -40,4 +40,4 @@
   - Time should continue progressing smoothly (assume that it represents UTC; time zone independent)
   - The viewer vector should be correctly updated in all schematics. 
   - The viewer should maintain the same orientation relative to the horizon.
-- [] Add latitude labels (0, 30N/S, 60N/S, 90N/S) on the globe. 
+- [x] Add latitude labels (0, 30N/S, 60N/S, 90N/S) on the globe. 

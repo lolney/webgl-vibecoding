@@ -152,7 +152,7 @@ body {
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 0 20px #66b8ff33;
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 5;
   background: rgba(4, 10, 24, 0.8);
 }
@@ -165,6 +165,8 @@ body {
   width: 100%;
   height: calc(100% - 28px);
   display: block;
+  cursor: ns-resize;
+  touch-action: none;
 }
 
 #viewerLatitude {

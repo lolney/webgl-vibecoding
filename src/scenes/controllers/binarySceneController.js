@@ -417,6 +417,7 @@ export function updateBinaryScene(ctx, frame) {
       viewerTangent: [orbit.viewerTangentWorld.x, orbit.viewerTangentWorld.y, orbit.viewerTangentWorld.z],
       primaryDir: [orbit.primaryDir.x, orbit.primaryDir.y, orbit.primaryDir.z],
       secondaryDir: [orbit.secondaryDir.x, orbit.secondaryDir.y, orbit.secondaryDir.z],
+      spinAxis: [orbit.spinAxis.x, orbit.spinAxis.y, orbit.spinAxis.z],
       viewerLightDot: orbit.viewerLightDot,
     },
     lighting: lightingDebugState(lighting),

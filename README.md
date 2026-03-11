@@ -90,6 +90,14 @@ Runs deterministic clocktower lighting captures with explicit section/audio over
 npm run headless:clocktower-lighting
 ```
 
+## Headless latitude regression
+
+Runs the planet-POV latitude wheel regression, including real drag interaction on the upper-left globe inset, pole wrapping, and viewer-heading stability checks.
+
+```bash
+npm run headless:latitude
+```
+
 Examples:
 
 ```bash
@@ -122,6 +130,7 @@ Useful flags:
 - `--section=<0-3>`, `--beat=<0-1>`, `--level=<0-1>`
 - `--azimuth`, `--polar`, `--distance`
 - `--target-x`, `--target-y`, `--target-z`
+- `--viewer-drag-x`, `--viewer-drag-y`
 - `--wait-ms=<milliseconds>`
 - `--debug` (disables post-processing)
 - `--sweep-azimuth=0,90,180,270` (takes multiple angle shots in one run; values can be degrees or radians)
