@@ -86,6 +86,83 @@ function clampColor(color, maxValue = 1.5) {
   return color;
 }
 
+function computeSkyResponse({ daylight, twilight, haze, horizonWarmth, primary, secondary }) {
+  const primaryRayleighRadiance = multiplyColor(primary.apparentColor, RAYLEIGH_COEFF)
+    .multiplyScalar(primary.scatterFactor * (0.48 + primary.transmittanceLuma * 0.52));
+  const secondaryRayleighRadiance = multiplyColor(secondary.apparentColor, RAYLEIGH_COEFF)
+    .multiplyScalar(secondary.scatterFactor * (0.42 + secondary.transmittanceLuma * 0.58));
+  const rayleighRadiance = primaryRayleighRadiance.clone().add(secondaryRayleighRadiance);
+
+  const primaryMieRadiance = multiplyColor(primary.apparentColor, MIE_COEFF)
+    .multiplyScalar(primary.mieFactor * (0.55 + primary.horizonFactor * 0.45));
+  const secondaryMieRadiance = multiplyColor(secondary.apparentColor, MIE_COEFF)
+    .multiplyScalar(secondary.mieFactor * (0.48 + secondary.horizonFactor * 0.36));
+  const mieRadiance = primaryMieRadiance.clone().add(secondaryMieRadiance);
+
+  const zenithRadiance = scaleColor(rayleighRadiance, 0.82 + daylight * 0.28)
+    .add(scaleColor(mieRadiance, 0.08 + haze * 0.04))
+    .add(scaleColor(AIR_GLOW_COEFF, daylight * 0.06));
+  const horizonRadiance = scaleColor(rayleighRadiance, 0.34 + twilight * 0.18)
+    .add(scaleColor(mieRadiance, 0.92 + haze * 0.52))
+    .add(scaleColor(primary.apparentColor, primary.horizonFactor * 0.14))
+    .add(scaleColor(secondary.apparentColor, secondary.horizonFactor * 0.08));
+
+  const zenithColor = clampColor(NIGHT_ZENITH.clone().add(zenithRadiance), 1.2);
+  const horizonColor = clampColor(NIGHT_HORIZON.clone().add(horizonRadiance), 1.25);
+  const ambientColor = NIGHT_HORIZON.clone()
+    .lerp(horizonColor, twilight * 0.55 + daylight * 0.3)
+    .lerp(zenithColor, daylight * 0.42);
+  const fogColor = horizonColor.clone().lerp(zenithColor, 0.34 + daylight * 0.18);
+  const backgroundColor = fogColor.clone().multiplyScalar(0.78 + daylight * 0.14);
+
+  return {
+    rayleighRadiance,
+    mieRadiance,
+    zenithColor,
+    horizonColor,
+    ambientColor,
+    fogColor,
+    backgroundColor,
+    rayleighColor: chromaOrFallback(rayleighRadiance, RAYLEIGH_COEFF),
+    mieColorA: chromaOrFallback(primaryMieRadiance, primary.apparentColor),
+    mieColorB: chromaOrFallback(secondaryMieRadiance, secondary.apparentColor),
+    scatterStrengthA: primary.scatterFactor,
+    scatterStrengthB: secondary.scatterFactor * 0.7,
+    mieStrengthA: primary.mieFactor,
+    mieStrengthB: secondary.mieFactor * 0.85,
+    fogDensity: THREE.MathUtils.lerp(0.098, 0.032, daylight),
+    horizonWarmth,
+  };
+}
+
+function computeSurfaceResponse({ daylight, primary, secondary, orbit }) {
+  const combinedSunDirection = orbit.primaryLocalDir.clone().multiplyScalar(primary.directIlluminanceLux + 2000)
+    .add(orbit.secondaryLocalDir.clone().multiplyScalar(secondary.directIlluminanceLux + 1200));
+  if (combinedSunDirection.lengthSq() < 1e-6) combinedSunDirection.set(0.2, 0.92, 0.34);
+  combinedSunDirection.normalize();
+
+  const primaryGlitter = primary.visibleFactor * (0.16 + primary.horizonFactor * 0.84);
+  const secondaryGlitter = secondary.visibleFactor * (0.12 + secondary.horizonFactor * 0.72);
+  const glitterBlend = clamp01(primaryGlitter + secondaryGlitter * 0.82);
+
+  return {
+    combinedSunDirection,
+    primaryGlitter,
+    secondaryGlitter,
+    glitterBlend,
+    waterSunColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.18)
+      .multiplyScalar(0.14 + daylight * 0.34),
+    farWaterSunColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.26)
+      .multiplyScalar(0.18 + daylight * 0.38),
+    nearWaterColor: daylight > 0.35 ? new THREE.Color(0x0a2742) : new THREE.Color(0x07162a),
+    farWaterColor: daylight > 0.35 ? new THREE.Color(0x103654) : new THREE.Color(0x0a1d35),
+    distortionNear: THREE.MathUtils.lerp(0.44, 0.86, primary.horizonFactor),
+    distortionFar: THREE.MathUtils.lerp(0.68, 1.12, primary.horizonFactor),
+    sizeNear: THREE.MathUtils.lerp(2.1, 2.7, primary.horizonFactor),
+    sizeFar: THREE.MathUtils.lerp(2.7, 3.5, primary.horizonFactor),
+  };
+}
+
 function solarState({
   altitude,
   azimuth,
@@ -169,44 +246,7 @@ export function computeLightingState(orbit) {
     primary.horizonFactor * primary.visibleFactor * 0.88
       + secondary.horizonFactor * secondary.visibleFactor * 0.34,
   );
-
-  const primaryRayleighRadiance = multiplyColor(primary.apparentColor, RAYLEIGH_COEFF)
-    .multiplyScalar(primary.scatterFactor * (0.48 + primary.transmittanceLuma * 0.52));
-  const secondaryRayleighRadiance = multiplyColor(secondary.apparentColor, RAYLEIGH_COEFF)
-    .multiplyScalar(secondary.scatterFactor * (0.42 + secondary.transmittanceLuma * 0.58));
-  const rayleighRadiance = primaryRayleighRadiance.clone().add(secondaryRayleighRadiance);
-
-  const primaryMieRadiance = multiplyColor(primary.apparentColor, MIE_COEFF)
-    .multiplyScalar(primary.mieFactor * (0.55 + primary.horizonFactor * 0.45));
-  const secondaryMieRadiance = multiplyColor(secondary.apparentColor, MIE_COEFF)
-    .multiplyScalar(secondary.mieFactor * (0.48 + secondary.horizonFactor * 0.36));
-  const mieRadiance = primaryMieRadiance.clone().add(secondaryMieRadiance);
-
-  const zenithRadiance = scaleColor(rayleighRadiance, 0.82 + daylight * 0.28)
-    .add(scaleColor(mieRadiance, 0.08 + haze * 0.04))
-    .add(scaleColor(AIR_GLOW_COEFF, daylight * 0.06));
-  const horizonRadiance = scaleColor(rayleighRadiance, 0.34 + twilight * 0.18)
-    .add(scaleColor(mieRadiance, 0.92 + haze * 0.52))
-    .add(scaleColor(primary.apparentColor, primary.horizonFactor * 0.14))
-    .add(scaleColor(secondary.apparentColor, secondary.horizonFactor * 0.08));
-
-  const zenithColor = clampColor(NIGHT_ZENITH.clone().add(zenithRadiance), 1.2);
-  const horizonColor = clampColor(NIGHT_HORIZON.clone().add(horizonRadiance), 1.25);
-  const rayleighColor = chromaOrFallback(rayleighRadiance, RAYLEIGH_COEFF);
-  const mieColorA = chromaOrFallback(primaryMieRadiance, primary.apparentColor);
-  const mieColorB = chromaOrFallback(secondaryMieRadiance, secondary.apparentColor);
-
-  const ambientColor = NIGHT_HORIZON.clone()
-    .lerp(horizonColor, twilight * 0.55 + daylight * 0.3)
-    .lerp(zenithColor, daylight * 0.42);
-  const fogColor = horizonColor.clone().lerp(zenithColor, 0.34 + daylight * 0.18);
-  const backgroundColor = fogColor.clone().multiplyScalar(0.78 + daylight * 0.14);
   const exposure = THREE.MathUtils.clamp(0.29 + daylight * 0.19 - horizonWarmth * 0.03, 0.26, 0.48);
-
-  const combinedSunDirection = orbit.primaryLocalDir.clone().multiplyScalar(primary.directIlluminanceLux + 2000)
-    .add(orbit.secondaryLocalDir.clone().multiplyScalar(secondary.directIlluminanceLux + 1200));
-  if (combinedSunDirection.lengthSq() < 1e-6) combinedSunDirection.set(0.2, 0.92, 0.34);
-  combinedSunDirection.normalize();
 
   const ambientLux = THREE.MathUtils.lerp(
     binaryLightModel.ambientBounce.nightLux,
@@ -216,6 +256,31 @@ export function computeLightingState(orbit) {
   const fillLux = binaryLightModel.fillBounce.baseLux
     + primary.directIlluminanceLux * binaryLightModel.fillBounce.primaryScale / 10_000
     + secondary.directIlluminanceLux * binaryLightModel.fillBounce.secondaryScale / 10_000;
+  const transport = {
+    primaryAirMass: primary.airMass,
+    secondaryAirMass: secondary.airMass,
+    primaryTransmittance: primary.transmittanceLuma,
+    secondaryTransmittance: secondary.transmittanceLuma,
+    daylight,
+    twilight,
+    night,
+    haze,
+    horizonWarmth,
+  };
+  const skyResponse = computeSkyResponse({
+    daylight,
+    twilight,
+    haze,
+    horizonWarmth,
+    primary,
+    secondary,
+  });
+  const surfaceResponse = computeSurfaceResponse({
+    daylight,
+    primary,
+    secondary,
+    orbit,
+  });
 
   return {
     primary,
@@ -228,16 +293,7 @@ export function computeLightingState(orbit) {
       primaryHaloLuminance: primary.haloLuminance,
       secondaryHaloLuminance: secondary.haloLuminance,
     },
-    transport: {
-      primaryAirMass: primary.airMass,
-      secondaryAirMass: secondary.airMass,
-      primaryTransmittance: primary.transmittanceLuma,
-      secondaryTransmittance: secondary.transmittanceLuma,
-      daylight,
-      twilight,
-      night,
-      haze,
-    },
+    transport,
     illumination: {
       directTotalLux,
       primaryDirectLux: primary.directIlluminanceLux,
@@ -250,41 +306,29 @@ export function computeLightingState(orbit) {
         + daylight * binaryLightModel.atmosphere.daylightGain
         + twilight * binaryLightModel.atmosphere.twilightGain,
     },
-    sky: {
-      daylight,
-      twilight,
-      night,
-      haze,
-      horizonWarmth,
-      zenithColor,
-      horizonColor,
+    skyResponse: {
+      zenithColor: skyResponse.zenithColor,
+      horizonColor: skyResponse.horizonColor,
       nightZenith: NIGHT_ZENITH.clone(),
       nightHorizon: NIGHT_HORIZON.clone(),
-      rayleighColor,
-      mieColorA,
-      mieColorB,
-      scatterStrengthA: primary.scatterFactor,
-      scatterStrengthB: secondary.scatterFactor * 0.7,
-      mieStrengthA: primary.mieFactor,
-      mieStrengthB: secondary.mieFactor * 0.85,
-      ambientColor,
-      fogColor,
-      backgroundColor,
-      exposure,
-      fogDensity: THREE.MathUtils.lerp(0.098, 0.032, daylight),
+      rayleighColor: skyResponse.rayleighColor,
+      mieColorA: skyResponse.mieColorA,
+      mieColorB: skyResponse.mieColorB,
+      scatterStrengthA: skyResponse.scatterStrengthA,
+      scatterStrengthB: skyResponse.scatterStrengthB,
+      mieStrengthA: skyResponse.mieStrengthA,
+      mieStrengthB: skyResponse.mieStrengthB,
+      ambientColor: skyResponse.ambientColor,
+      fogColor: skyResponse.fogColor,
+      backgroundColor: skyResponse.backgroundColor,
+      fogDensity: skyResponse.fogDensity,
+      zenithLuminance: luma(skyResponse.zenithColor),
+      horizonLuminance: luma(skyResponse.horizonColor),
     },
-    surface: {
-      combinedSunDirection,
-      waterSunColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.18)
-        .multiplyScalar(0.14 + daylight * 0.34),
-      farWaterSunColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.26)
-        .multiplyScalar(0.18 + daylight * 0.38),
-      nearWaterColor: daylight > 0.35 ? new THREE.Color(0x0a2742) : new THREE.Color(0x07162a),
-      farWaterColor: daylight > 0.35 ? new THREE.Color(0x103654) : new THREE.Color(0x0a1d35),
-      distortionNear: THREE.MathUtils.lerp(0.44, 0.86, primary.horizonFactor),
-      distortionFar: THREE.MathUtils.lerp(0.68, 1.12, primary.horizonFactor),
-      sizeNear: THREE.MathUtils.lerp(2.1, 2.7, primary.horizonFactor),
-      sizeFar: THREE.MathUtils.lerp(2.7, 3.5, primary.horizonFactor),
+    surfaceResponse,
+    surfaceOptics: {
+      primaryReflectionGain: primary.reflectionGain,
+      secondaryReflectionGain: secondary.reflectionGain,
     },
     display: {
       bloomStrength: 0.004 + primary.horizonFactor * 0.014 + secondary.mieFactor * 0.01,
@@ -312,19 +356,22 @@ export function lightingDebugState(lighting) {
     extinctionBucketR: Number(ATMOSPHERIC_EXTINCTION.r.toFixed(4)),
     extinctionBucketG: Number(ATMOSPHERIC_EXTINCTION.g.toFixed(4)),
     extinctionBucketB: Number(ATMOSPHERIC_EXTINCTION.b.toFixed(4)),
-    skyZenithLuminance: Number(luma(lighting.sky.zenithColor).toFixed(4)),
-    skyHorizonLuminance: Number(luma(lighting.sky.horizonColor).toFixed(4)),
+    skyZenithLuminance: Number(lighting.skyResponse.zenithLuminance.toFixed(4)),
+    skyHorizonLuminance: Number(lighting.skyResponse.horizonLuminance.toFixed(4)),
     primaryDiscLuminance: Number(lighting.sourceUnits.primaryDiscLuminance.toFixed(3)),
     secondaryDiscLuminance: Number(lighting.sourceUnits.secondaryDiscLuminance.toFixed(3)),
     primaryHaloLuminance: Number(lighting.sourceUnits.primaryHaloLuminance.toFixed(3)),
     secondaryHaloLuminance: Number(lighting.sourceUnits.secondaryHaloLuminance.toFixed(3)),
     primaryTransmittance: Number(lighting.transport.primaryTransmittance.toFixed(4)),
     secondaryTransmittance: Number(lighting.transport.secondaryTransmittance.toFixed(4)),
+    primaryReflectionGain: Number(lighting.surfaceOptics.primaryReflectionGain.toFixed(4)),
+    secondaryReflectionGain: Number(lighting.surfaceOptics.secondaryReflectionGain.toFixed(4)),
+    waterGlitterBlend: Number(lighting.surfaceResponse.glitterBlend.toFixed(4)),
     primaryLightIntensity: Number(lighting.illumination.primaryLightIntensity.toFixed(3)),
     secondaryLightIntensity: Number(lighting.illumination.secondaryLightIntensity.toFixed(3)),
-    daylightFactor: Number(lighting.sky.daylight.toFixed(4)),
-    twilightFactor: Number(lighting.sky.twilight.toFixed(4)),
-    hazeFactor: Number(lighting.sky.haze.toFixed(4)),
+    daylightFactor: Number(lighting.transport.daylight.toFixed(4)),
+    twilightFactor: Number(lighting.transport.twilight.toFixed(4)),
+    hazeFactor: Number(lighting.transport.haze.toFixed(4)),
     exposure: Number(lighting.display.exposure.toFixed(4)),
     bloomStrength: Number(lighting.display.bloomStrength.toFixed(4)),
   };

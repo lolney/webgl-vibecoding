@@ -14,7 +14,7 @@
     - [x] Upgrade extinction from RGB heuristics to coarse wavelength-bucket modeling
   - [] Cross-cutting cleanup
     - [x] Remove or isolate non-celestial helper lights in the planet scene
-    - [] Separate source radiometry, atmospheric transport, surface response, and display response
+    - [x] Separate source radiometry, atmospheric transport, surface response, and display response
   - [] Phase 3: volumetrics
     - [] Add volumetric aerial perspective
     - [] Add physically directional light shafts for strong emitters

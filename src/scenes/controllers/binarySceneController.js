@@ -74,8 +74,9 @@ export function updateBinaryScene(ctx, frame) {
   const lighting = computeLightingState(orbit);
   const { primary, secondary } = lighting;
   const {
-    sky: skyLighting,
-    surface: surfaceLighting,
+    transport,
+    skyResponse,
+    surfaceResponse,
     illumination,
     display,
   } = lighting;
@@ -91,13 +92,13 @@ export function updateBinaryScene(ctx, frame) {
 
   if (isSurfaceScene) {
     binaryAmbient.intensity = illumination.ambientLux;
-    binaryAmbient.color.copy(skyLighting.ambientColor);
-    scene.fog.color.copy(skyLighting.fogColor);
-    scene.background.copy(skyLighting.backgroundColor);
-    scene.fog.density = skyLighting.fogDensity;
+    binaryAmbient.color.copy(skyResponse.ambientColor);
+    scene.fog.color.copy(skyResponse.fogColor);
+    scene.background.copy(skyResponse.backgroundColor);
+    scene.fog.density = skyResponse.fogDensity;
     renderer.toneMappingExposure = display.exposure;
-    stars.material.opacity = THREE.MathUtils.lerp(0.96, 0.12, skyLighting.daylight);
-    stars.material.size = THREE.MathUtils.lerp(0.24, 0.06, skyLighting.daylight);
+    stars.material.opacity = THREE.MathUtils.lerp(0.96, 0.12, transport.daylight);
+    stars.material.size = THREE.MathUtils.lerp(0.24, 0.06, transport.daylight);
   } else if (isExternalScene) {
     binaryAmbient.intensity = 0.0;
     binaryAmbient.color.setRGB(0.0, 0.0, 0.0);
@@ -188,17 +189,17 @@ export function updateBinaryScene(ctx, frame) {
       0.68 + primary.horizonFactor * 0.16,
     );
     surfaceOcean.material.uniforms.time.value = t * 0.34;
-    surfaceOcean.material.uniforms.sunDirection.value.copy(surfaceLighting.combinedSunDirection);
-    surfaceOcean.material.uniforms.sunColor.value.copy(surfaceLighting.waterSunColor);
-    surfaceOcean.material.uniforms.distortionScale.value = surfaceLighting.distortionNear;
-    surfaceOcean.material.uniforms.size.value = surfaceLighting.sizeNear;
-    surfaceOcean.material.uniforms.waterColor.value.copy(surfaceLighting.nearWaterColor);
+    surfaceOcean.material.uniforms.sunDirection.value.copy(surfaceResponse.combinedSunDirection);
+    surfaceOcean.material.uniforms.sunColor.value.copy(surfaceResponse.waterSunColor);
+    surfaceOcean.material.uniforms.distortionScale.value = surfaceResponse.distortionNear;
+    surfaceOcean.material.uniforms.size.value = surfaceResponse.sizeNear;
+    surfaceOcean.material.uniforms.waterColor.value.copy(surfaceResponse.nearWaterColor);
     surfaceFarOcean.material.uniforms.time.value = t * 0.24 + 8.0;
-    surfaceFarOcean.material.uniforms.sunDirection.value.copy(surfaceLighting.combinedSunDirection);
-    surfaceFarOcean.material.uniforms.sunColor.value.copy(surfaceLighting.farWaterSunColor);
-    surfaceFarOcean.material.uniforms.distortionScale.value = surfaceLighting.distortionFar;
-    surfaceFarOcean.material.uniforms.size.value = surfaceLighting.sizeFar;
-    surfaceFarOcean.material.uniforms.waterColor.value.copy(surfaceLighting.farWaterColor);
+    surfaceFarOcean.material.uniforms.sunDirection.value.copy(surfaceResponse.combinedSunDirection);
+    surfaceFarOcean.material.uniforms.sunColor.value.copy(surfaceResponse.farWaterSunColor);
+    surfaceFarOcean.material.uniforms.distortionScale.value = surfaceResponse.distortionFar;
+    surfaceFarOcean.material.uniforms.size.value = surfaceResponse.sizeFar;
+    surfaceFarOcean.material.uniforms.waterColor.value.copy(surfaceResponse.farWaterColor);
 
     surfaceSunA.group.visible = primary.visibleFactor > 0.01;
     surfaceSunB.group.visible = secondary.visibleFactor > 0.01;
@@ -266,27 +267,27 @@ export function updateBinaryScene(ctx, frame) {
     binaryFill.intensity = illumination.fillLux;
 
     surfaceGround.material.color.setRGB(
-      THREE.MathUtils.lerp(0.01, 0.06, skyLighting.daylight),
-      THREE.MathUtils.lerp(0.015, 0.08, skyLighting.daylight),
-      THREE.MathUtils.lerp(0.03, 0.1, skyLighting.daylight),
+      THREE.MathUtils.lerp(0.01, 0.06, transport.daylight),
+      THREE.MathUtils.lerp(0.015, 0.08, transport.daylight),
+      THREE.MathUtils.lerp(0.03, 0.1, transport.daylight),
     );
-    surfaceSky.material.uniforms.uZenithColor.value.copy(skyLighting.zenithColor);
-    surfaceSky.material.uniforms.uHorizonColor.value.copy(skyLighting.horizonColor);
-    surfaceSky.material.uniforms.uNightZenith.value.copy(skyLighting.nightZenith);
-    surfaceSky.material.uniforms.uNightHorizon.value.copy(skyLighting.nightHorizon);
-    surfaceSky.material.uniforms.uRayleighColor.value.copy(skyLighting.rayleighColor);
-    surfaceSky.material.uniforms.uMieColorA.value.copy(skyLighting.mieColorA);
-    surfaceSky.material.uniforms.uMieColorB.value.copy(skyLighting.mieColorB);
+    surfaceSky.material.uniforms.uZenithColor.value.copy(skyResponse.zenithColor);
+    surfaceSky.material.uniforms.uHorizonColor.value.copy(skyResponse.horizonColor);
+    surfaceSky.material.uniforms.uNightZenith.value.copy(skyResponse.nightZenith);
+    surfaceSky.material.uniforms.uNightHorizon.value.copy(skyResponse.nightHorizon);
+    surfaceSky.material.uniforms.uRayleighColor.value.copy(skyResponse.rayleighColor);
+    surfaceSky.material.uniforms.uMieColorA.value.copy(skyResponse.mieColorA);
+    surfaceSky.material.uniforms.uMieColorB.value.copy(skyResponse.mieColorB);
     surfaceSky.material.uniforms.uSunDirA.value.copy(orbit.primaryLocalDir);
     surfaceSky.material.uniforms.uSunDirB.value.copy(orbit.secondaryLocalDir);
-    surfaceSky.material.uniforms.uDayStrength.value = skyLighting.daylight;
-    surfaceSky.material.uniforms.uTwilightStrength.value = skyLighting.twilight;
-    surfaceSky.material.uniforms.uNightStrength.value = skyLighting.night;
-    surfaceSky.material.uniforms.uHaze.value = skyLighting.haze;
-    surfaceSky.material.uniforms.uScatterStrengthA.value = skyLighting.scatterStrengthA;
-    surfaceSky.material.uniforms.uScatterStrengthB.value = skyLighting.scatterStrengthB;
-    surfaceSky.material.uniforms.uMieStrengthA.value = skyLighting.mieStrengthA;
-    surfaceSky.material.uniforms.uMieStrengthB.value = skyLighting.mieStrengthB;
+    surfaceSky.material.uniforms.uDayStrength.value = transport.daylight;
+    surfaceSky.material.uniforms.uTwilightStrength.value = transport.twilight;
+    surfaceSky.material.uniforms.uNightStrength.value = transport.night;
+    surfaceSky.material.uniforms.uHaze.value = transport.haze;
+    surfaceSky.material.uniforms.uScatterStrengthA.value = skyResponse.scatterStrengthA;
+    surfaceSky.material.uniforms.uScatterStrengthB.value = skyResponse.scatterStrengthB;
+    surfaceSky.material.uniforms.uMieStrengthA.value = skyResponse.mieStrengthA;
+    surfaceSky.material.uniforms.uMieStrengthB.value = skyResponse.mieStrengthB;
   }
 
   stars.rotation.y = t * 0.004;

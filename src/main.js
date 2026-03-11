@@ -2359,6 +2359,9 @@ function tick() {
       ? `discLum A ${sceneDebug.lighting.primaryDiscLuminance.toFixed(2)} B ${sceneDebug.lighting.secondaryDiscLuminance.toFixed(2)}`
       : "discLum A --.-- B --.--",
     sceneDebug.lighting
+      ? `reflect A ${sceneDebug.lighting.primaryReflectionGain.toFixed(2)} glitter ${sceneDebug.lighting.waterGlitterBlend.toFixed(2)}`
+      : "reflect A --.-- glitter --.--",
+    sceneDebug.lighting
       ? `exposure ${sceneDebug.lighting.exposure.toFixed(3)} haze ${sceneDebug.lighting.hazeFactor.toFixed(3)}`
       : "exposure --.--- haze --.---",
   ] : []);
