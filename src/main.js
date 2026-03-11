@@ -19,6 +19,7 @@ import { createViewerSchematic } from "./ui/viewerSchematic.js";
 import { updateBinaryScene } from "./scenes/controllers/binarySceneController.js";
 import { updateClocktowerScene } from "./scenes/controllers/clocktowerSceneController.js";
 import { applySceneModeInternal } from "./scenes/controllers/sceneModeController.js";
+import { computeBinarySimulationState } from "./scenes/shared/orbital.js";
 
 const canvas = document.getElementById("gl");
 const audioButton = document.getElementById("audioToggle");
@@ -514,10 +515,10 @@ const surfaceSky = new THREE.Mesh(
       uB: { value: new THREE.Vector3(0, 1, 0) },
     },
     vertexShader: `
-      varying vec3 vDir;
+      varying vec3 vLocalDir;
       void main() {
         vec4 world = modelMatrix * vec4(position, 1.0);
-        vDir = normalize(position);
+        vLocalDir = normalize(position);
         gl_Position = projectionMatrix * viewMatrix * world;
       }
     `,
@@ -527,32 +528,25 @@ const surfaceSky = new THREE.Mesh(
       uniform float uSecond;
       uniform vec3 uA;
       uniform vec3 uB;
-      varying vec3 vDir;
+      varying vec3 vLocalDir;
       void main() {
-        vec3 dir = normalize(vDir);
+        vec3 dir = normalize(vLocalDir);
         float h = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
-        vec3 nightTop = vec3(0.004, 0.012, 0.045);
-        vec3 nightHorizon = vec3(0.03, 0.045, 0.1);
-        vec3 twiTop = vec3(0.12, 0.15, 0.33);
-        vec3 twiHorizon = vec3(0.95, 0.33, 0.2);
-        vec3 dayTop = vec3(0.24, 0.58, 0.93);
-        vec3 dayHorizon = vec3(0.95, 0.72, 0.48);
+        vec3 nightTop = vec3(0.003, 0.009, 0.03);
+        vec3 nightHorizon = vec3(0.016, 0.026, 0.06);
+        vec3 twiTop = vec3(0.07, 0.11, 0.24);
+        vec3 twiHorizon = vec3(0.45, 0.24, 0.16);
+        vec3 dayTop = vec3(0.11, 0.33, 0.66);
+        vec3 dayHorizon = vec3(0.21, 0.29, 0.42);
         vec3 nightCol = mix(nightHorizon, nightTop, h);
         vec3 twiCol = mix(twiHorizon, twiTop, h);
         vec3 dayCol = mix(dayHorizon, dayTop, h);
         vec3 base = mix(mix(nightCol, twiCol, uTwilight), dayCol, uDay);
-        float horizonBand = smoothstep(0.02, 0.22, h) * (1.0 - smoothstep(0.22, 0.35, h));
-        base += vec3(1.0, 0.42, 0.22) * horizonBand * uTwilight * 0.35;
-        float dA = dot(dir, normalize(uA));
-        float dB = dot(dir, normalize(uB));
-        float glowA = pow(max(dA, 0.0), 16.0);
-        float glowB = pow(max(dB, 0.0), 16.4) * uSecond;
-        float sunA = smoothstep(0.99905, 0.99965, dA);
-        float sunB = smoothstep(0.9991, 0.9997, dB) * uSecond;
-        vec3 col = base + vec3(1.0, 0.72, 0.36) * glowA * 0.5 + vec3(0.6, 0.78, 1.0) * glowB * 0.7;
-        col += vec3(1.0, 0.93, 0.78) * sunA * 1.35;
-        col += vec3(0.72, 0.86, 1.0) * sunB * 1.25;
-        gl_FragColor = vec4(col, 1.0);
+        float horizonBand = smoothstep(0.01, 0.2, h) * (1.0 - smoothstep(0.2, 0.38, h));
+        float waterlineBand = smoothstep(0.0, 0.05, h) * (1.0 - smoothstep(0.05, 0.14, h));
+        base *= 1.0 - waterlineBand * 0.28;
+        base += vec3(1.0, 0.46, 0.22) * horizonBand * uTwilight * 0.22;
+        gl_FragColor = vec4(base, 1.0);
       }
     `,
   }),
@@ -575,6 +569,7 @@ surfaceGround.visible = false;
 surfacePovGroup.add(surfaceGround);
 
 let surfaceOcean = null;
+let surfaceFarOcean = null;
 
 function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
   const g = new THREE.Group();
@@ -585,6 +580,8 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
       depthTest: false,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      toneMapped: false,
       uniforms: {
         uColor: { value: new THREE.Color(coreColor) },
       },
@@ -617,6 +614,8 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
       depthTest: false,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      toneMapped: false,
       uniforms: {
         uColor: { value: new THREE.Color(glowColor) },
         uStrength: { value: 1.0 },
@@ -649,8 +648,8 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
   return { group: g, core, glow };
 }
 
-const surfaceSunA = makeSurfaceSun(0xfff2be, 0xffcb6d, 0.08, 0.55);
-const surfaceSunB = makeSurfaceSun(0xc6dbff, 0x7eb1ff, 0.065, 0.42);
+const surfaceSunA = makeSurfaceSun(0xfff2be, 0xffcb6d, 3.2, 16.0);
+const surfaceSunB = makeSurfaceSun(0xc6dbff, 0x7eb1ff, 2.4, 12.0);
 surfaceSunA.group.visible = false;
 surfaceSunB.group.visible = false;
 surfacePovGroup.add(surfaceSunA.group);
@@ -710,21 +709,39 @@ function makeWaterNormalsTexture(size = 256) {
 }
 
 const waterNormals = makeWaterNormalsTexture(256);
-surfaceOcean = new Water(new THREE.PlaneGeometry(20000, 20000, 120, 120), {
+const surfaceOceanGeometry = new THREE.PlaneGeometry(108, 108, 180, 180);
+const surfaceOceanBasePos = surfaceOceanGeometry.attributes.position.array.slice();
+surfaceOcean = new Water(surfaceOceanGeometry, {
   textureWidth: 1024,
   textureHeight: 1024,
   waterNormals,
-  sunDirection: new THREE.Vector3(0.0, 1.0, -1.0).normalize(),
+  sunDirection: new THREE.Vector3(0.38, 1.0, 0.42).normalize(),
   sunColor: 0xffffff,
-  waterColor: 0x195f9f,
-  distortionScale: 2.3,
+  waterColor: 0x123c63,
+  distortionScale: 2.0,
   fog: true,
-  alpha: 0.96,
+  alpha: 0.97,
 });
 surfaceOcean.rotation.x = -Math.PI / 2;
-surfaceOcean.position.set(0, 0.01, 0);
-surfaceOcean.material.uniforms.size.value = 1.9;
+surfaceOcean.material.uniforms.size.value = 1.8;
 surfacePovGroup.add(surfaceOcean);
+
+const surfaceFarOceanGeometry = new THREE.PlaneGeometry(164, 136, 120, 96);
+const surfaceFarOceanBasePos = surfaceFarOceanGeometry.attributes.position.array.slice();
+surfaceFarOcean = new Water(surfaceFarOceanGeometry, {
+  textureWidth: 512,
+  textureHeight: 512,
+  waterNormals,
+  sunDirection: new THREE.Vector3(0.4, 1.0, 0.35).normalize(),
+  sunColor: 0xffffff,
+  waterColor: 0x1b4f7c,
+  distortionScale: 2.8,
+  fog: true,
+  alpha: 0.92,
+});
+surfaceFarOcean.rotation.x = -Math.PI / 2;
+surfaceFarOcean.material.uniforms.size.value = 2.4;
+surfacePovGroup.add(surfaceFarOcean);
 const shorelineZ = -1.35;
 const oceanGeometry = new THREE.PlaneGeometry(72, 66, 140, 140);
 const oceanBasePos = oceanGeometry.attributes.position.array.slice();
@@ -1327,17 +1344,101 @@ const sceneByKey = Object.fromEntries(sceneDefinitions.map((sceneDef) => [sceneD
 const sceneLabels = Object.fromEntries(sceneDefinitions.map((sceneDef) => [sceneDef.key, sceneDef.label]));
 hud.setSceneOptions(sceneDefinitions);
 hud.setTitle("NEON CLOCKTOWER // DEMOSCENE CUT");
-let binaryDayHours = binaryHourQuery !== null ? THREE.MathUtils.euclideanModulo(binaryHourQuery, 24) : 13.2;
-let binarySimulationDays = binaryDayHours / 24;
+const binaryDefaultStartHour = 6.0;
+const binaryDefaultSimulationDays = 85.35;
+const binaryTimeMultipliers = [1, 2, 4, 8, 16];
+let binaryDayHours = binaryHourQuery !== null ? THREE.MathUtils.euclideanModulo(binaryHourQuery, 24) : binaryDefaultStartHour;
+let binarySimulationDays = binaryHourQuery !== null
+  ? binaryDefaultSimulationDays + ((binaryHourQuery - binaryDefaultStartHour) / 24)
+  : binaryDefaultSimulationDays;
 const binaryHourRateBase = binaryHourRateQuery !== null ? binaryHourRateQuery : 0.12;
 let binaryTimeMultiplier = 1;
 let observerLatitudeDeg = binaryLatQuery !== null ? THREE.MathUtils.clamp(binaryLatQuery, -85, 85) : 0;
 let observerLongitudeDeg = binaryLonQuery !== null ? binaryLonQuery : 0;
+const surfaceObserverAnchor = new THREE.Vector3();
+const surfaceLookDir = new THREE.Vector3(0, 0.04, 1).normalize();
+let surfaceViewDistance = 13.2;
+let surfaceYaw = 0;
+let surfacePitch = -0.08;
 let lastTickTime = 0;
+
+function wrapAngle(angle) {
+  return THREE.MathUtils.euclideanModulo(angle + Math.PI, Math.PI * 2) - Math.PI;
+}
+
+function lerpAngle(from, to, t) {
+  return from + wrapAngle(to - from) * t;
+}
+
+function getSurfaceObserverState() {
+  return computeBinarySimulationState({
+    binaryDayHours,
+    simulationDays: binarySimulationDays,
+    planetOrbitRadius,
+    cameraPosition: surfaceObserverAnchor,
+    cameraTarget: surfaceObserverAnchor.clone().add(surfaceLookDir),
+    observerLatitude: THREE.MathUtils.degToRad(observerLatitudeDeg || 0),
+    observerLongitude: THREE.MathUtils.degToRad(observerLongitudeDeg || 0),
+    viewerHeadingYaw: surfaceYaw,
+    viewerPitch: surfacePitch,
+  });
+}
+
+function updateSurfaceCamera(cinematicMix = 0) {
+  const orbit = getSurfaceObserverState();
+  if (cinematicMix > 0.001) {
+    const targetYaw = Math.atan2(orbit.primaryLocalDir.x, orbit.primaryLocalDir.z);
+    const targetPitch = Math.asin(THREE.MathUtils.clamp(orbit.primaryLocalDir.y, -1, 1));
+    surfaceYaw = lerpAngle(surfaceYaw, targetYaw, cinematicMix * 0.14);
+    surfacePitch = THREE.MathUtils.lerp(surfacePitch, targetPitch, cinematicMix * 0.14);
+  }
+  surfacePitch = THREE.MathUtils.clamp(surfacePitch, -0.28, 1.22);
+  const cosPitch = Math.cos(surfacePitch);
+  surfaceLookDir
+    .set(
+      Math.sin(surfaceYaw) * cosPitch,
+      Math.sin(surfacePitch),
+      Math.cos(surfaceYaw) * cosPitch,
+    )
+    .normalize();
+  camera.position.copy(surfaceObserverAnchor);
+  controls.target.copy(surfaceObserverAnchor).add(surfaceLookDir.clone().multiplyScalar(surfaceViewDistance));
+  camera.up.set(0, 1, 0);
+  camera.lookAt(controls.target);
+}
 
 function updateTimeRateLabel() {
   if (!timeRateButton) return;
   timeRateButton.textContent = `${binaryTimeMultiplier}x`;
+}
+
+function setBinaryClockHours(hours, options = {}) {
+  if (!Number.isFinite(hours)) return;
+  const { preserveContinuity = true } = options;
+  const normalizedHours = THREE.MathUtils.euclideanModulo(hours, 24);
+  binaryDayHours = normalizedHours;
+  if (preserveContinuity) {
+    const currentTotalHours = binarySimulationDays * 24;
+    const nearestDayIndex = Math.round((currentTotalHours - normalizedHours) / 24);
+    binarySimulationDays = (nearestDayIndex * 24 + normalizedHours) / 24;
+  } else {
+    binarySimulationDays = binaryDefaultSimulationDays + ((hours - binaryDefaultStartHour) / 24);
+  }
+}
+
+function setBinaryTimeMultiplier(mult) {
+  if (!Number.isFinite(mult)) return;
+  let nextMultiplier = binaryTimeMultipliers[0];
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const candidate of binaryTimeMultipliers) {
+    const distance = Math.abs(candidate - mult);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      nextMultiplier = candidate;
+    }
+  }
+  binaryTimeMultiplier = nextMultiplier;
+  updateTimeRateLabel();
 }
 
 function format24Hour(hoursValue) {
@@ -1410,6 +1511,15 @@ function applySceneMode(nextSceneKey, options = {}) {
     syncSceneToUrl,
     setCinematic,
   });
+  if (activeSceneKey === "binarySurface") {
+    surfaceObserverAnchor.set(0, 1.42, 0);
+    surfaceViewDistance = 13.2;
+    const orbit = getSurfaceObserverState();
+    surfaceYaw = Math.atan2(orbit.primaryLocalDir.x, orbit.primaryLocalDir.z);
+    surfacePitch = -0.08;
+    updateSurfaceCamera(0);
+  }
+  controls.enabled = activeSceneKey !== "binarySurface";
   orbitSchematic.setVisible(activeSceneKey === "binarySurface");
   viewerSchematic.setVisible(activeSceneKey === "binarySurface");
   if (timeIndicator) {
@@ -1668,14 +1778,45 @@ function markInteraction() {
   lastInteraction = performance.now();
 }
 
-renderer.domElement.addEventListener("pointerdown", () => {
+let surfacePointerId = null;
+let surfacePointerLastX = 0;
+let surfacePointerLastY = 0;
+
+renderer.domElement.addEventListener("pointerdown", (e) => {
   markInteraction();
   if (cinematic) setCinematic(false);
+  if (activeSceneKey === "binarySurface") {
+    surfacePointerId = e.pointerId;
+    surfacePointerLastX = e.clientX;
+    surfacePointerLastY = e.clientY;
+    renderer.domElement.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
 });
-renderer.domElement.addEventListener("wheel", () => {
+window.addEventListener("pointermove", (e) => {
+  if (activeSceneKey !== "binarySurface" || surfacePointerId !== e.pointerId) return;
+  const dx = e.clientX - surfacePointerLastX;
+  const dy = e.clientY - surfacePointerLastY;
+  surfacePointerLastX = e.clientX;
+  surfacePointerLastY = e.clientY;
+  surfaceYaw -= dx * 0.0052;
+  surfacePitch = THREE.MathUtils.clamp(surfacePitch - dy * 0.0038, -0.28, 1.46);
+  markInteraction();
+});
+function releaseSurfacePointer(e) {
+  if (surfacePointerId !== e.pointerId) return;
+  surfacePointerId = null;
+}
+window.addEventListener("pointerup", releaseSurfacePointer);
+window.addEventListener("pointercancel", releaseSurfacePointer);
+renderer.domElement.addEventListener("wheel", (e) => {
+  if (activeSceneKey === "binarySurface") {
+    surfaceViewDistance = THREE.MathUtils.clamp(surfaceViewDistance + e.deltaY * 0.01, 6, 18);
+    e.preventDefault();
+  }
   markInteraction();
   if (cinematic) setCinematic(false);
-}, { passive: true });
+}, { passive: false });
 window.addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() === "c") {
     setCinematic(!cinematic);
@@ -1689,7 +1830,9 @@ modeBadge.addEventListener("click", () => {
 if (timeRateButton) {
   updateTimeRateLabel();
   timeRateButton.addEventListener("click", () => {
-    binaryTimeMultiplier = (binaryTimeMultiplier % 5) + 1;
+    const currentIndex = binaryTimeMultipliers.indexOf(binaryTimeMultiplier);
+    const nextIndex = (currentIndex + 1) % binaryTimeMultipliers.length;
+    binaryTimeMultiplier = binaryTimeMultipliers[nextIndex];
     updateTimeRateLabel();
     markInteraction();
   });
@@ -1708,26 +1851,25 @@ window.addEventListener("popstate", () => {
 window.__demoState = { ok: true, frames: 0, lastTime: 0, debug: {} };
 window.__canvas = canvas;
 window.__setBinaryTime = (hours) => {
-  if (!Number.isFinite(hours)) return;
-  binaryDayHours = THREE.MathUtils.euclideanModulo(hours, 24);
-  binarySimulationDays = hours / 24;
+  setBinaryClockHours(hours, { preserveContinuity: true });
+  if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
 };
 window.__getBinaryTime = () => binaryDayHours;
 window.__getBinarySimulationDays = () => binarySimulationDays;
 window.__setObserverLatitude = (latDeg) => {
   if (!Number.isFinite(latDeg)) return;
   observerLatitudeDeg = THREE.MathUtils.clamp(latDeg, -85, 85);
+  if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
 };
 window.__getObserverLatitude = () => observerLatitudeDeg;
 window.__setObserverLongitude = (lonDeg) => {
   if (!Number.isFinite(lonDeg)) return;
   observerLongitudeDeg = lonDeg;
+  if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
 };
 window.__getObserverLongitude = () => observerLongitudeDeg;
 window.__setTimeMultiplier = (mult) => {
-  if (!Number.isFinite(mult)) return;
-  binaryTimeMultiplier = THREE.MathUtils.clamp(Math.round(mult), 1, 5);
-  updateTimeRateLabel();
+  setBinaryTimeMultiplier(mult);
 };
 window.__getTimeMultiplier = () => binaryTimeMultiplier;
 window.__setScene = (sceneKey) => {
@@ -1735,25 +1877,33 @@ window.__setScene = (sceneKey) => {
 };
 window.__setOrbitView = (view = {}) => {
   const azimuth = Number.isFinite(view.azimuth) ? view.azimuth : 0;
-  const polar = Number.isFinite(view.polar) ? view.polar : Math.PI * 0.52;
+  const defaultPolar = activeSceneKey === "binarySurface" ? 1.35 : Math.PI * 0.52;
+  const polar = Number.isFinite(view.polar) ? view.polar : defaultPolar;
   const distance = Number.isFinite(view.distance) ? view.distance : 12;
   const tx = Number.isFinite(view.targetX) ? view.targetX : controls.target.x;
   const ty = Number.isFinite(view.targetY) ? view.targetY : controls.target.y;
   const tz = Number.isFinite(view.targetZ) ? view.targetZ : controls.target.z;
-  controls.target.set(tx, ty, tz);
+  const clampedDistance = THREE.MathUtils.clamp(distance, controls.minDistance, controls.maxDistance);
   const s = new THREE.Spherical(
-    THREE.MathUtils.clamp(distance, controls.minDistance, controls.maxDistance),
+    clampedDistance,
     THREE.MathUtils.clamp(polar, controls.minPolarAngle, controls.maxPolarAngle),
     azimuth,
   );
   const offset = new THREE.Vector3().setFromSpherical(s);
-  camera.position.copy(controls.target).add(offset);
-  if (activeSceneKey === "binarySurface" && camera.position.y < 1.05) camera.position.y = 1.05;
-  camera.up.set(0, 1, 0);
-  controls.update();
+  if (activeSceneKey === "binarySurface") {
+    surfaceViewDistance = clampedDistance;
+    surfaceYaw = azimuth;
+    surfacePitch = THREE.MathUtils.clamp((Math.PI / 2) - polar, -0.28, 1.22);
+    updateSurfaceCamera(0);
+  } else {
+    controls.target.set(tx, ty, tz);
+    camera.position.copy(controls.target).add(offset);
+    camera.up.set(0, 1, 0);
+    controls.update();
+  }
   return {
-    azimuth: controls.getAzimuthalAngle(),
-    polar: controls.getPolarAngle(),
+    azimuth: activeSceneKey === "binarySurface" ? surfaceYaw : controls.getAzimuthalAngle(),
+    polar: activeSceneKey === "binarySurface" ? ((Math.PI / 2) - surfacePitch) : controls.getPolarAngle(),
     distance: camera.position.distanceTo(controls.target),
     target: controls.target.toArray(),
   };
@@ -1818,6 +1968,11 @@ const binaryControllerCtx = {
   surfaceGround,
   surfaceSky,
   surfaceOcean,
+  surfaceOceanGeometry,
+  surfaceFarOcean,
+  surfaceOceanBasePos,
+  surfaceFarOceanGeometry,
+  surfaceFarOceanBasePos,
   surfaceSunA,
   surfaceSunB,
   surfaceReflectionA,
@@ -1827,6 +1982,7 @@ const binaryControllerCtx = {
   timeIndicator,
   format24Hour,
   planetOrbitRadius,
+  displaceWaterGeometry,
 };
 
 const clocktowerControllerCtx = {
@@ -1898,7 +2054,9 @@ function tick() {
     setCinematic(cinematic);
   }
 
-  controls.update();
+  if (activeSceneKey !== "binarySurface") {
+    controls.update();
+  }
   const shouldCinematicBlend = cinematic;
   cinematicMix = THREE.MathUtils.lerp(cinematicMix, shouldCinematicBlend ? 1 : 0, 0.02);
   const dayAdvance = dt * binaryHourRateBase * binaryTimeMultiplier;
@@ -1907,6 +2065,9 @@ function tick() {
     24,
   );
   binarySimulationDays += dayAdvance / 24;
+  if (activeSceneKey === "binarySurface") {
+    updateSurfaceCamera(cinematicMix);
+  }
 
   let sceneDebug = {};
   if (activeSceneKey !== "clocktower") {
@@ -1920,6 +2081,8 @@ function tick() {
       binarySimulationDays,
       observerLatitudeDeg,
       observerLongitudeDeg,
+      surfaceYaw,
+      surfacePitch,
       debugView,
     });
     orbitSchematic.render(activeSceneKey === "binarySurface" ? sceneDebug.schematic : null);
@@ -1954,6 +2117,7 @@ function tick() {
     blenderTower: usingBlenderTower,
     blenderCity: usingBlenderCity,
     debugView,
+    binaryDayHours: Number(binaryDayHours.toFixed(4)),
     timeMultiplier: binaryTimeMultiplier,
     binarySimulationDays: Number(binarySimulationDays.toFixed(4)),
     observerLatitudeDeg: Number(observerLatitudeDeg.toFixed(2)),

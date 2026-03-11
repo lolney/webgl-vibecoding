@@ -123,14 +123,17 @@ export function createOrbitSchematic({ root = document } = {}) {
     body(sxB, syB, 5.8, "#dbe8ff", "rgba(121, 168, 255, 0.75)");
     body(px0, py0, 4.2, "#8cc2ff", "rgba(62, 122, 255, 0.6)");
 
+    const siteOffset = 9.5;
+    const siteX = px0 + spinDir[0] * siteOffset;
+    const siteY = py0 - spinDir[1] * siteOffset;
     const spinLen = 22;
     const viewLen = 34;
     drawArrow(
       ctx,
-      px0,
-      py0,
-      px0 + combinedStarDir[0] * 26,
-      py0 - combinedStarDir[1] * 26,
+      siteX,
+      siteY,
+      siteX + combinedStarDir[0] * 26,
+      siteY - combinedStarDir[1] * 26,
       "rgba(255, 186, 92, 0.9)",
       1.4,
     );
@@ -143,12 +146,16 @@ export function createOrbitSchematic({ root = document } = {}) {
       "rgba(120, 220, 255, 0.95)",
       1.5,
     );
+    ctx.fillStyle = "rgba(255, 244, 110, 0.98)";
+    ctx.beginPath();
+    ctx.arc(siteX, siteY, 3.2, 0, Math.PI * 2);
+    ctx.fill();
     drawArrow(
       ctx,
-      px0,
-      py0,
-      px0 + viewerDir[0] * viewLen,
-      py0 - viewerDir[1] * viewLen,
+      siteX,
+      siteY,
+      siteX + viewerDir[0] * viewLen,
+      siteY - viewerDir[1] * viewLen,
       "rgba(255, 244, 110, 0.95)",
       2.2,
     );

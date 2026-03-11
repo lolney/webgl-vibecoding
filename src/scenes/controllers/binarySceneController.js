@@ -23,6 +23,11 @@ export function updateBinaryScene(ctx, frame) {
     surfaceGround,
     surfaceSky,
     surfaceOcean,
+    surfaceOceanGeometry,
+    surfaceFarOcean,
+    surfaceOceanBasePos,
+    surfaceFarOceanGeometry,
+    surfaceFarOceanBasePos,
     surfaceSunA,
     surfaceSunB,
     surfaceReflectionA,
@@ -32,6 +37,7 @@ export function updateBinaryScene(ctx, frame) {
     timeIndicator,
     format24Hour,
     planetOrbitRadius,
+    displaceWaterGeometry,
   } = ctx;
 
   const {
@@ -44,8 +50,13 @@ export function updateBinaryScene(ctx, frame) {
     binarySimulationDays,
     observerLatitudeDeg,
     observerLongitudeDeg,
+    surfaceYaw = null,
+    surfacePitch = 0,
     debugView,
   } = frame;
+
+  const isSurfaceScene = activeSceneKey === "binarySurface";
+  const isExternalScene = activeSceneKey === "binaryExternal";
 
   const orbit = computeBinarySimulationState({
     binaryDayHours,
@@ -55,6 +66,8 @@ export function updateBinaryScene(ctx, frame) {
     cameraTarget: controls.target,
     observerLatitude: THREE.MathUtils.degToRad(observerLatitudeDeg || 0),
     observerLongitude: THREE.MathUtils.degToRad(observerLongitudeDeg || 0),
+    viewerHeadingYaw: isSurfaceScene ? surfaceYaw : null,
+    viewerPitch: isSurfaceScene ? surfacePitch : 0,
   });
   const {
     starAPosition,
@@ -67,11 +80,16 @@ export function updateBinaryScene(ctx, frame) {
     twilight,
     primaryDir,
     secondaryDir,
+    combinedStarWorld,
+    primaryLocalDir,
+    secondaryLocalDir,
   } = orbit;
 
   const nightness = 1 - daylight;
-  const isSurfaceScene = activeSceneKey === "binarySurface";
-  const isExternalScene = activeSceneKey === "binaryExternal";
+  const maxSunAltitude = Math.max(orbit.primaryAltitude, orbit.secondaryAltitude);
+  const sunHeight01 = THREE.MathUtils.clamp(Math.sin(Math.max(0, maxSunAltitude)), 0, 1);
+  const primaryVisible = orbit.primaryAltitude > THREE.MathUtils.degToRad(-8);
+  const secondaryVisible = orbit.secondaryAltitude > THREE.MathUtils.degToRad(-8);
 
   starAGroup.position.copy(starAPosition);
   starBGroup.position.copy(starBPosition);
@@ -99,9 +117,10 @@ export function updateBinaryScene(ctx, frame) {
       THREE.MathUtils.lerp(0.01, 0.3, daylight),
       THREE.MathUtils.lerp(0.04, 0.5, daylight),
     );
-    scene.fog.density = THREE.MathUtils.lerp(0.078, 0.034, daylight);
-    renderer.toneMappingExposure = THREE.MathUtils.lerp(0.46, 0.9, daylight) + secondStrength * 0.06;
-    stars.material.opacity = THREE.MathUtils.lerp(0.92, 0.08, daylight);
+    scene.fog.density = THREE.MathUtils.lerp(0.082, 0.03, daylight);
+    renderer.toneMappingExposure = THREE.MathUtils.lerp(0.36, 0.54, daylight) + secondStrength * 0.02;
+    stars.material.opacity = THREE.MathUtils.lerp(0.96, 0.12, daylight);
+    stars.material.size = THREE.MathUtils.lerp(0.24, 0.06, daylight);
   } else if (isExternalScene) {
     ambient.intensity = 0.0;
     ambient.color.setRGB(0.0, 0.0, 0.0);
@@ -110,6 +129,7 @@ export function updateBinaryScene(ctx, frame) {
     scene.fog.density = 0.019;
     renderer.toneMappingExposure = 0.86;
     stars.material.opacity = 0.95;
+    stars.material.size = 0.08;
   }
 
   if (isExternalScene) {
@@ -118,8 +138,8 @@ export function updateBinaryScene(ctx, frame) {
     binaryFill.intensity = 0.0;
     planetAtmosphere.material.uniforms.uIntensity.value = 0.22;
   } else {
-    binaryStarALight.intensity = 2200 + dayStrength * 6200;
-    binaryStarBLight.intensity = 260 + secondStrength * 4200;
+    binaryStarALight.intensity = 1200 + dayStrength * 2800;
+    binaryStarBLight.intensity = 140 + secondStrength * 1800;
     binaryFill.intensity = 0.12 + daylight * 0.75 + secondStrength * 0.24;
     planetAtmosphere.material.uniforms.uIntensity.value = 0.38;
   }
@@ -143,65 +163,138 @@ export function updateBinaryScene(ctx, frame) {
     camera.position.lerp(extAutoPos, cinematicMix * 0.05);
     controls.target.lerp(new THREE.Vector3(0, 0, 0), cinematicMix * 0.06);
   } else {
-    if (cinematicMix > 0.001) {
-      // Sun-track mode rotates aim only while preserving camera position and orbit distance.
-      const followDistance = THREE.MathUtils.clamp(camera.position.distanceTo(controls.target), 6, 18);
-      const primaryTarget = camera.position.clone().add(primaryDir.clone().multiplyScalar(followDistance));
-      controls.target.lerp(primaryTarget, cinematicMix * 0.14);
-    }
     if (camera.position.y < 1.0) camera.position.y = 1.0;
     camera.up.set(0, 1, 0);
+    const horizonBoost = 1 - sunHeight01;
+    const surfaceForward = controls.target.clone().sub(camera.position).setY(0);
+    if (surfaceForward.lengthSq() < 1e-6) {
+      surfaceForward.set(0, 0, -1);
+    } else {
+      surfaceForward.normalize();
+    }
+    const surfaceRight = new THREE.Vector3().crossVectors(surfaceForward, new THREE.Vector3(0, 1, 0)).normalize();
+    const surfaceYawAngle = Math.atan2(surfaceForward.x, surfaceForward.z);
 
+    surfaceSky.visible = true;
     surfaceSky.position.copy(camera.position);
-    surfaceGround.position.x = camera.position.x;
-    surfaceGround.position.z = camera.position.z;
-    surfaceOcean.position.x = camera.position.x;
-    surfaceOcean.position.z = camera.position.z;
-    surfaceOcean.material.uniforms.time.value = t * 0.42;
-
-    const mixedSunDir = primaryDir
-      .clone()
-      .multiplyScalar(Math.max(0.05, dayStrength))
-      .add(secondaryDir.clone().multiplyScalar(Math.max(0.0, secondStrength * 1.2)))
-      .normalize();
-    surfaceOcean.material.uniforms.sunDirection.value.copy(mixedSunDir);
-    surfaceOcean.material.uniforms.distortionScale.value = 1.6 + beat * 1.2 + nightness * 1.1 + twilight * 0.45;
-    surfaceOcean.material.uniforms.waterColor.value.setRGB(
-      THREE.MathUtils.lerp(0.03, 0.09, daylight),
-      THREE.MathUtils.lerp(0.1, 0.35, daylight),
-      THREE.MathUtils.lerp(0.24, 0.62, daylight),
+    surfaceSky.rotation.set(0, 0, 0);
+    surfaceGround.visible = false;
+    surfaceGround.rotation.set(-Math.PI / 2, 0, 0);
+    surfaceGround.position.set(camera.position.x, -0.14, camera.position.z);
+    const surfaceSunDir = primaryLocalDir.clone().multiplyScalar(Math.max(0.4, dayStrength)).add(
+      secondaryLocalDir.clone().multiplyScalar(Math.max(0.12, secondStrength * 0.7)),
     );
+    if (surfaceSunDir.lengthSq() < 1e-6) surfaceSunDir.set(0.2, 0.9, 0.35);
+    surfaceSunDir.normalize();
 
-    // Surface suns are rendered by the sky shader; keep billboards disabled to avoid edge artifacts.
-    surfaceSunA.group.visible = false;
-    surfaceSunB.group.visible = false;
+    surfaceOcean.visible = true;
+    surfaceFarOcean.visible = true;
+    surfaceOcean.rotation.set(-Math.PI / 2, 0, 0);
+    surfaceFarOcean.rotation.set(-Math.PI / 2 + 0.1, surfaceYawAngle, 0);
+    surfaceOcean.position.copy(camera.position).add(surfaceForward.clone().multiplyScalar(18));
+    surfaceOcean.position.y = camera.position.y - 1.82;
+    surfaceFarOcean.position.copy(camera.position).add(surfaceForward.clone().multiplyScalar(180));
+    surfaceFarOcean.position.y = camera.position.y - 1.58;
+    surfaceOcean.scale.set(118, 104, 0.22);
+    surfaceFarOcean.scale.set(168, 128, 0.16);
+    displaceWaterGeometry(surfaceOceanGeometry, surfaceOceanBasePos, t * 0.78, 0.92 + horizonBoost * 0.22);
+    displaceWaterGeometry(surfaceFarOceanGeometry, surfaceFarOceanBasePos, t * 0.6 + 5.0, 0.68 + horizonBoost * 0.16);
+    surfaceOcean.material.uniforms.time.value = t * 0.34;
+    surfaceOcean.material.uniforms.sunDirection.value.copy(surfaceSunDir);
+    surfaceOcean.material.uniforms.sunColor.value.setRGB(
+      THREE.MathUtils.lerp(0.16, 0.28, dayStrength),
+      THREE.MathUtils.lerp(0.18, 0.3, dayStrength),
+      THREE.MathUtils.lerp(0.2, 0.32, dayStrength),
+    );
+    surfaceOcean.material.uniforms.distortionScale.value = THREE.MathUtils.lerp(0.7, 1.2, horizonBoost);
+    surfaceOcean.material.uniforms.size.value = 3.4;
+    surfaceOcean.material.uniforms.waterColor.value.set(daylight > 0.35 ? 0x0b2238 : 0x07162a);
+    surfaceFarOcean.material.uniforms.time.value = t * 0.24 + 8.0;
+    surfaceFarOcean.material.uniforms.sunDirection.value.copy(surfaceSunDir);
+    surfaceFarOcean.material.uniforms.sunColor.value.setRGB(
+      THREE.MathUtils.lerp(0.18, 0.34, dayStrength),
+      THREE.MathUtils.lerp(0.2, 0.36, dayStrength),
+      THREE.MathUtils.lerp(0.24, 0.42, dayStrength),
+    );
+    surfaceFarOcean.material.uniforms.distortionScale.value = THREE.MathUtils.lerp(1.0, 1.7, horizonBoost);
+    surfaceFarOcean.material.uniforms.size.value = 4.2;
+    surfaceFarOcean.material.uniforms.waterColor.value.set(daylight > 0.35 ? 0x112f49 : 0x0a1d35);
+
+    // Explicit sun billboards keep the solar motion readable in the local sky frame.
+    surfaceSunA.group.visible = primaryVisible;
+    surfaceSunB.group.visible = secondaryVisible;
     surfaceReflectionA.visible = false;
     surfaceReflectionB.visible = false;
 
-    binaryStarALight.position.copy(camera.position).add(primaryDir.clone().multiplyScalar(90));
-    binaryStarBLight.position.copy(camera.position).add(secondaryDir.clone().multiplyScalar(84));
-    binaryStarALight.intensity = 18 + dayStrength * 8400;
-    binaryStarBLight.intensity = 4 + secondStrength * 7600;
+    if (primaryVisible) {
+      surfaceSunA.group.position.copy(camera.position).add(primaryLocalDir.clone().multiplyScalar(86));
+      surfaceSunA.group.lookAt(camera.position);
+      surfaceSunA.glow.visible = true;
+      surfaceSunA.glow.material.uniforms.uStrength.value = 0.36 + dayStrength * 0.34;
+      surfaceSunA.group.scale.setScalar(1.7 + (1 - sunHeight01) * 0.55);
+
+      const primaryAhead = Math.max(0, primaryLocalDir.dot(surfaceForward));
+      const primaryRight = primaryLocalDir.dot(surfaceRight);
+      const primaryReflection = primaryAhead * THREE.MathUtils.clamp(1 - sunHeight01 * 1.35, 0, 1);
+      if (primaryReflection > 0.035) {
+        surfaceReflectionA.visible = true;
+        surfaceReflectionA.position.copy(camera.position)
+          .add(surfaceForward.clone().multiplyScalar(70 + primaryAhead * 34))
+          .add(surfaceRight.clone().multiplyScalar(primaryRight * 26));
+        surfaceReflectionA.position.y = camera.position.y - 1.76;
+        surfaceReflectionA.rotation.set(-Math.PI / 2, 0, -primaryRight * 0.16);
+        surfaceReflectionA.scale.set(0.6, 0.52, 1);
+        surfaceReflectionA.material.opacity = 0.015 + primaryReflection * 0.08;
+      }
+    }
+
+    if (secondaryVisible) {
+      surfaceSunB.group.position.copy(camera.position).add(secondaryLocalDir.clone().multiplyScalar(82));
+      surfaceSunB.group.lookAt(camera.position);
+      surfaceSunB.glow.visible = true;
+      surfaceSunB.glow.material.uniforms.uStrength.value = 0.22 + secondStrength * 0.28;
+      surfaceSunB.group.scale.setScalar(1.35 + (1 - sunHeight01) * 0.44);
+
+      const secondaryAhead = Math.max(0, secondaryLocalDir.dot(surfaceForward));
+      const secondaryRight = secondaryLocalDir.dot(surfaceRight);
+      const secondaryReflection = secondaryAhead * THREE.MathUtils.clamp(1 - sunHeight01 * 1.5, 0, 1);
+      if (secondaryReflection > 0.03) {
+        surfaceReflectionB.visible = true;
+        surfaceReflectionB.position.copy(camera.position)
+          .add(surfaceForward.clone().multiplyScalar(64 + secondaryAhead * 28))
+          .add(surfaceRight.clone().multiplyScalar(secondaryRight * 22));
+        surfaceReflectionB.position.y = camera.position.y - 1.77;
+        surfaceReflectionB.rotation.set(-Math.PI / 2, 0, -secondaryRight * 0.14);
+        surfaceReflectionB.scale.set(0.58, 0.46, 1);
+        surfaceReflectionB.material.opacity = 0.01 + secondaryReflection * 0.06;
+      }
+    }
+
+    binaryStarALight.position.copy(camera.position).add(primaryLocalDir.clone().multiplyScalar(90));
+    binaryStarBLight.position.copy(camera.position).add(secondaryLocalDir.clone().multiplyScalar(84));
+    binaryStarALight.intensity = 18 + dayStrength * (92 + (1 - sunHeight01) * 56);
+    binaryStarBLight.intensity = 4 + secondStrength * (52 + (1 - sunHeight01) * 40);
     binaryFill.intensity = 0.08 + dayStrength * 0.32 + secondStrength * 0.24;
 
     surfaceGround.material.color.setRGB(
-      THREE.MathUtils.lerp(0.04, 0.22, daylight),
-      THREE.MathUtils.lerp(0.06, 0.28, daylight),
-      THREE.MathUtils.lerp(0.11, 0.33, daylight),
+      THREE.MathUtils.lerp(0.01, 0.06, daylight),
+      THREE.MathUtils.lerp(0.015, 0.08, daylight),
+      THREE.MathUtils.lerp(0.03, 0.1, daylight),
     );
     surfaceSky.material.uniforms.uDay.value = THREE.MathUtils.clamp(daylight, 0.0, 1.0);
     surfaceSky.material.uniforms.uTwilight.value = THREE.MathUtils.clamp(twilight, 0.0, 1.0);
     surfaceSky.material.uniforms.uSecond.value = secondStrength;
-    surfaceSky.material.uniforms.uA.value.copy(primaryDir);
-    surfaceSky.material.uniforms.uB.value.copy(secondaryDir);
+    surfaceSky.material.uniforms.uA.value.copy(primaryLocalDir);
+    surfaceSky.material.uniforms.uB.value.copy(secondaryLocalDir);
   }
 
   stars.rotation.y = t * 0.004;
   sky.rotation.y = -t * 0.003;
   if (isSurfaceScene) {
-    bloomPass.strength = 0.18 + secondStrength * 0.14 + beat * 0.06;
-    bloomPass.radius = 0.14 + secondStrength * 0.08;
-    bloomPass.threshold = 0.9;
+    const horizonBoost = 1 - sunHeight01;
+    bloomPass.strength = 0.012 + horizonBoost * 0.026 + secondStrength * 0.02 + beat * 0.015;
+    bloomPass.radius = 0.04 + horizonBoost * 0.025 + secondStrength * 0.014;
+    bloomPass.threshold = THREE.MathUtils.lerp(0.998, 0.975, horizonBoost);
   } else if (isExternalScene) {
     bloomPass.strength = 0.24 + beat * 0.05;
     bloomPass.radius = 0.14;
@@ -234,7 +327,7 @@ export function updateBinaryScene(ctx, frame) {
       starA: [orbit.starAPosition.x, orbit.starAPosition.z],
       starB: [orbit.starBPosition.x, orbit.starBPosition.z],
       planet: [orbit.planetPosition.x, orbit.planetPosition.z],
-      spinDir: [orbit.spinDir.x, orbit.spinDir.y],
+      spinDir: [orbit.siteDirWorld.x, orbit.siteDirWorld.y],
       viewerDir: [orbit.viewerDir.x, orbit.viewerDir.y],
       combinedStarDir: [orbit.combinedStarDir.x, orbit.combinedStarDir.y],
       viewerLightDot: orbit.viewerLightDot,

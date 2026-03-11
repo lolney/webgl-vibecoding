@@ -70,11 +70,11 @@ export function applySceneModeInternal(params) {
     cloudLayer.visible = true;
     hud.setScene("binaryExternal");
   } else {
-    controls.target.set(0, 1.2, -80);
+    controls.target.set(0, 4.15, -53.92);
     planetMesh.visible = false;
     cloudLayer.visible = false;
     camera.up.set(0, 1, 0);
-    camera.position.set(0, 1.75, 13.0);
+    camera.position.set(0, 1.278, -66.8);
     hud.setScene("binarySurface");
   }
   controls.update();

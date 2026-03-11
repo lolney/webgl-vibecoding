@@ -58,6 +58,26 @@ Validate critical behaviors for:
   - `cameraTarget` changes over time in cinematic mode
   - mode badge text = `Sun-Track Camera // Planet POV`
 
+7. Equatorial solar altitude follows a physical day arc
+- Command:
+  - `node scripts/headless-render.mjs --scene=binarySurface --hour=6 --hour-rate=0 --lat=0 --lon=0 --name=eq-h6 --wait-ms=1200`
+  - `node scripts/headless-render.mjs --scene=binarySurface --hour=9 --hour-rate=0 --lat=0 --lon=0 --name=eq-h9 --wait-ms=1200`
+  - `node scripts/headless-render.mjs --scene=binarySurface --hour=12 --hour-rate=0 --lat=0 --lon=0 --name=eq-h12 --wait-ms=1200`
+  - `node scripts/headless-render.mjs --scene=binarySurface --hour=15 --hour-rate=0 --lat=0 --lon=0 --name=eq-h15 --wait-ms=1200`
+  - `node scripts/headless-render.mjs --scene=binarySurface --hour=18 --hour-rate=0 --lat=0 --lon=0 --name=eq-h18 --wait-ms=1200`
+- Expected:
+  - primary solar altitude near horizon at sunrise/sunset
+  - primary solar altitude high near local noon
+  - progression is monotonic rising into noon and falling after noon
+
+8. Accelerated time remains continuous through midnight
+- Command:
+  - Playwright sample loop in `binarySurface` starting near `23:42` with `binaryHourRate=0.4` and multiplier `16`
+- Expected:
+  - `binarySimulationDays` increases continuously past integer day boundaries
+  - solar altitude changes smoothly
+  - no orbital-state reset when `time24` wraps from `23:xx` to `00:xx`
+
 ## Results
 
 1. Clocktower hides time badge: `PASS`
@@ -92,3 +112,17 @@ Validate critical behaviors for:
   - after mode: `Sun-Track Camera // Planet POV`
   - `cameraPos` unchanged (`[0, 2.077, -67.631]` before and after)
   - `cameraTarget` updates over time (e.g. from `[0,1.2,-80]` to `[-0.881,1.698,-79.961]`)
+
+7. Equatorial solar altitude day arc: `PASS`
+- Evidence (`/tmp/eq-h6.log`, `/tmp/eq-h9.log`, `/tmp/eq-h12.log`, `/tmp/eq-h15.log`, `/tmp/eq-h18.log`):
+  - `06:00`: primary altitude ~`0.0` degrees
+  - `09:00`: primary altitude ~`43.8` degrees
+  - `12:00`: primary altitude ~`78.4` degrees
+  - `15:00`: primary altitude ~`43.9` degrees
+  - `18:00`: primary altitude ~`0.0` degrees
+
+8. Accelerated midnight continuity: `PASS`
+- Evidence (Playwright sample loop captured on 2026-03-09):
+  - `binarySimulationDays` advances from `0.9933` to `1.0146` to `1.0426` while `time24` wraps from `23:50` to `00:21` to `01:01`
+  - corresponding solar altitudes continue smoothly from `-78.36` to `-77.47` to `-71.00` degrees
+  - no orbital-state reset was observed at midnight wrap

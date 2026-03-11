@@ -67,7 +67,7 @@ async function applyViewAndShot(page, view, localSlug) {
         window.__setOrbitView(next);
       }
     }, view);
-    await page.waitForTimeout(120);
+    await page.waitForTimeout(350);
   }
   const pagePath = path.join(projectRoot, "output", `${localSlug}-page.png`);
   const canvasPath = path.join(projectRoot, "output", `${localSlug}-canvas.png`);

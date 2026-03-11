@@ -29,6 +29,14 @@ function projectOnPlane(worldDir, planeNormal) {
   return worldDir.clone().sub(planeNormal.clone().multiplyScalar(worldDir.dot(planeNormal)));
 }
 
+function toXZUnit(vec3, fallback = null) {
+  const v = new THREE.Vector2(vec3.x, vec3.z);
+  if (v.lengthSq() < 1e-8) {
+    return fallback ? fallback.clone() : new THREE.Vector2(0, -1);
+  }
+  return v.normalize();
+}
+
 function buildLocalFrame(observerNormal, spinAxis) {
   const east = new THREE.Vector3().crossVectors(spinAxis, observerNormal);
   if (east.lengthSq() < 1e-8) {
@@ -48,6 +56,8 @@ export function computeBinarySimulationState({
   cameraTarget,
   observerLatitude = 0,
   observerLongitude = 0,
+  viewerHeadingYaw = null,
+  viewerPitch = 0,
 }) {
   const dayPhase = THREE.MathUtils.euclideanModulo(binaryDayHours, 24) / 24;
   const localHourAngle = (dayPhase - 0.5) * TAU + observerLongitude;
@@ -95,24 +105,32 @@ export function computeBinarySimulationState({
   const spinDir = new THREE.Vector2(observerNormal.x, observerNormal.z).normalize();
 
   // Viewer turning changes heading only; it does not move observer location.
-  const lookWorld = new THREE.Vector3().copy(cameraTarget).sub(cameraPosition);
-  if (lookWorld.lengthSq() < 1e-8) lookWorld.set(0, 0, -1);
-  lookWorld.normalize();
-  const viewerTangentWorld = projectToTangent(lookWorld, observerNormal);
   const { east, north } = buildLocalFrame(observerNormal, spinAxis);
-  const lookHorizontal = new THREE.Vector2(viewerTangentWorld.x, viewerTangentWorld.z);
-  if (lookHorizontal.lengthSq() < 1e-8) {
-    lookHorizontal.set(noonMeridian.x, noonMeridian.z);
+  const lookWorld = Number.isFinite(viewerHeadingYaw)
+    ? east.clone()
+      .multiplyScalar(Math.sin(viewerHeadingYaw) * Math.cos(viewerPitch))
+      .add(north.clone().multiplyScalar(Math.cos(viewerHeadingYaw) * Math.cos(viewerPitch)))
+      .add(observerNormal.clone().multiplyScalar(Math.sin(viewerPitch)))
+      .normalize()
+    : new THREE.Vector3().copy(cameraTarget).sub(cameraPosition).normalize();
+  if (lookWorld.lengthSq() < 1e-8) lookWorld.set(0, 0, -1);
+  const viewerTangentWorld = projectToTangent(lookWorld, observerNormal);
+  const viewerEast = viewerTangentWorld.dot(east);
+  const viewerNorth = viewerTangentWorld.dot(north);
+  const viewerDirLocal = new THREE.Vector2(viewerEast, viewerNorth);
+  if (viewerDirLocal.lengthSq() < 1e-8) {
+    viewerDirLocal.set(0, 1);
   }
-  lookHorizontal.normalize();
+  viewerDirLocal.normalize();
 
   // Weight by inverse-square falloff and star "intrinsic" brightness.
   const weightA = STAR_A_LUMINOSITY / (distA * distA);
   const weightB = STAR_B_LUMINOSITY / (distB * distB);
   const combinedStarWorld = toA.clone().multiplyScalar(weightA).add(toB.clone().multiplyScalar(weightB)).normalize();
   const combinedStarTangent = projectToTangent(combinedStarWorld, observerNormal);
-  const combinedStarDir = new THREE.Vector2(combinedStarTangent.x, combinedStarTangent.z);
-  if (combinedStarDir.lengthSq() > 1e-8) combinedStarDir.normalize();
+  const combinedStarDirWorld = toXZUnit(combinedStarWorld);
+  const combinedStarDirLocal = new THREE.Vector2(combinedStarTangent.dot(east), combinedStarTangent.dot(north));
+  if (combinedStarDirLocal.lengthSq() > 1e-8) combinedStarDirLocal.normalize();
 
   const altitudeA = Math.asin(THREE.MathUtils.clamp(toA.dot(observerNormal), -1, 1));
   const altitudeB = Math.asin(THREE.MathUtils.clamp(toB.dot(observerNormal), -1, 1));
@@ -132,16 +150,25 @@ export function computeBinarySimulationState({
   const primaryDir = toA;
   const secondaryDir = toB;
   const viewerLightDot = observerNormal.dot(combinedStarWorld);
+  const primaryLocalDir = new THREE.Vector3(
+    toA.dot(east),
+    toA.dot(observerNormal),
+    toA.dot(north),
+  ).normalize();
+  const secondaryLocalDir = new THREE.Vector3(
+    toB.dot(east),
+    toB.dot(observerNormal),
+    toB.dot(north),
+  ).normalize();
 
   // Heading is defined in the observer's local tangent frame.
-  const viewerDir = lookHorizontal.clone();
-  const viewerEast = viewerTangentWorld.dot(east);
-  const viewerNorth = viewerTangentWorld.dot(north);
-  const resolvedTurnYaw = Math.atan2(viewerEast, viewerNorth);
+  const resolvedTurnYaw = Number.isFinite(viewerHeadingYaw) ? viewerHeadingYaw : Math.atan2(viewerEast, viewerNorth);
   const observerYaw = Math.atan2(observerNormal.x, -observerNormal.z);
   const viewerYaw = observerYaw + resolvedTurnYaw;
   const primaryAzimuth = Math.atan2(toA.dot(east), toA.dot(north));
   const secondaryAzimuth = Math.atan2(toB.dot(east), toB.dot(north));
+  const siteDirWorld = toXZUnit(observerNormal, noonMeridian ? new THREE.Vector2(noonMeridian.x, noonMeridian.z).normalize() : null);
+  const viewerDirWorld = toXZUnit(viewerTangentWorld, siteDirWorld);
 
   return {
     dayPhase,
@@ -153,14 +180,18 @@ export function computeBinarySimulationState({
     observerLongitude,
     observerNormal,
     viewerTangentWorld,
+    east,
+    north,
     spinAxis,
     localHourAngle,
     starAPosition,
     starBPosition,
     planetPosition,
     spinDir,
-    viewerDir,
-    combinedStarDir,
+    viewerDir: viewerDirWorld,
+    viewerDirLocal,
+    combinedStarDir: combinedStarDirWorld,
+    combinedStarDirLocal,
     viewerLightDot,
     dayStrength,
     secondStrength,
@@ -168,6 +199,10 @@ export function computeBinarySimulationState({
     twilight,
     primaryDir,
     secondaryDir,
+    combinedStarWorld,
+    primaryLocalDir,
+    secondaryLocalDir,
+    siteDirWorld,
     primaryAltitude: altitudeA,
     secondaryAltitude: altitudeB,
     primaryAzimuth,

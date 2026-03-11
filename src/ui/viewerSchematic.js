@@ -104,12 +104,8 @@ export function createViewerSchematic({ root = document } = {}) {
     const secondaryDir = normalize3(data.secondaryDir || [0, 0, 1]);
     const latitudeDeg = Number(data.latitudeDeg) || 0;
 
-    // Keep the observer site generally visible while retaining a global tilt cue.
-    const forward = normalize3([
-      observerNormal[0] * 0.74 + 0.32,
-      observerNormal[1] * 0.68 + 0.52,
-      observerNormal[2] * 0.74 + 0.38,
-    ]);
+    // Keep the inset camera fixed so latitude and heading changes remain easy to read.
+    const forward = normalize3([0.72, 0.54, 0.92]);
     const right = normalize3(cross([0, 1, 0], forward));
     const up = normalize3(cross(forward, right));
     const basis = { forward, right, up };

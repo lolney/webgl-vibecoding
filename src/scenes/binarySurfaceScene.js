@@ -5,8 +5,8 @@ export const binarySurfaceScene = {
   controls: {
     minDistance: 11.8,
     maxDistance: 13.2,
-    minPolarAngle: 1.48,
-    maxPolarAngle: 1.62,
+    minPolarAngle: 1.14,
+    maxPolarAngle: 1.72,
     enablePan: false,
   },
 };
