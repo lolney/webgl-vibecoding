@@ -258,7 +258,7 @@ export function updateBinaryScene(ctx, frame) {
 
       const primaryAhead = Math.max(0, orbit.primaryLocalDir.dot(surfaceForward));
       const primaryRight = orbit.primaryLocalDir.dot(surfaceRight);
-      const primaryReflection = primaryAhead * primary.reflectionGain;
+      const primaryReflection = primaryAhead * surfaceResponse.waterFresnel * (0.18 + surfaceResponse.primarySpecular * 2.4);
       if (primaryReflection > 0.035) {
         surfaceReflectionA.visible = true;
         surfaceReflectionA.position.copy(camera.position)
@@ -267,7 +267,7 @@ export function updateBinaryScene(ctx, frame) {
         surfaceReflectionA.position.y = camera.position.y - 1.76;
         surfaceReflectionA.rotation.set(-Math.PI / 2, 0, -primaryRight * 0.16);
         surfaceReflectionA.scale.set(0.42, 0.34, 1);
-        surfaceReflectionA.material.opacity = 0.008 + primaryReflection * 0.035;
+        surfaceReflectionA.material.opacity = 0.004 + primaryReflection * 0.03;
       }
     }
 
@@ -301,7 +301,7 @@ export function updateBinaryScene(ctx, frame) {
 
       const secondaryAhead = Math.max(0, orbit.secondaryLocalDir.dot(surfaceForward));
       const secondaryRight = orbit.secondaryLocalDir.dot(surfaceRight);
-      const secondaryReflection = secondaryAhead * secondary.reflectionGain;
+      const secondaryReflection = secondaryAhead * surfaceResponse.waterFresnel * (0.16 + surfaceResponse.secondarySpecular * 2.1);
       if (secondaryReflection > 0.03) {
         surfaceReflectionB.visible = true;
         surfaceReflectionB.position.copy(camera.position)
@@ -310,7 +310,7 @@ export function updateBinaryScene(ctx, frame) {
         surfaceReflectionB.position.y = camera.position.y - 1.77;
         surfaceReflectionB.rotation.set(-Math.PI / 2, 0, -secondaryRight * 0.14);
         surfaceReflectionB.scale.set(0.38, 0.3, 1);
-        surfaceReflectionB.material.opacity = 0.006 + secondaryReflection * 0.028;
+        surfaceReflectionB.material.opacity = 0.003 + secondaryReflection * 0.024;
       }
     }
 

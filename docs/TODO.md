@@ -19,7 +19,7 @@
     - [x] Add volumetric aerial perspective
     - [x] Add physically directional light shafts for strong emitters
   - [] Phase 4: water and surface BRDF
-    - [] Replace heuristic ocean reflections with Fresnel + rough-surface response
+    - [x] Replace heuristic ocean reflections with Fresnel + rough-surface response
     - [] Add shoreline and near-surface scattering cues
   - [] Phase 5: clocktower PBR lighting
     - [] Make spotlights and strobes more physically grounded

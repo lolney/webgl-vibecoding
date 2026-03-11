@@ -114,6 +114,11 @@ export function computeBinarySimulationState({
       .normalize()
     : new THREE.Vector3().copy(cameraTarget).sub(cameraPosition).normalize();
   if (lookWorld.lengthSq() < 1e-8) lookWorld.set(0, 0, -1);
+  const lookLocal = new THREE.Vector3(
+    lookWorld.dot(east),
+    lookWorld.dot(observerNormal),
+    lookWorld.dot(north),
+  ).normalize();
   const viewerTangentWorld = projectToTangent(lookWorld, observerNormal);
   const viewerEast = viewerTangentWorld.dot(east);
   const viewerNorth = viewerTangentWorld.dot(north);
@@ -176,6 +181,8 @@ export function computeBinarySimulationState({
     viewerTurnYaw: resolvedTurnYaw,
     observerYaw,
     viewerYaw,
+    lookWorld,
+    lookLocal,
     observerLatitude,
     observerLongitude,
     observerNormal,
