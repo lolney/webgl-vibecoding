@@ -21,6 +21,7 @@ const readNumberArg = (name) => {
 };
 const debugMode = args.includes("--debug");
 const scene = getArg("scene");
+const preset = getArg("preset");
 const hour = readNumberArg("hour");
 const hourRate = readNumberArg("hour-rate");
 const latitude = readNumberArg("lat");
@@ -71,6 +72,7 @@ async function applyViewAndShot(page, view, localSlug) {
   }
   const pagePath = path.join(projectRoot, "output", `${localSlug}-page.png`);
   const canvasPath = path.join(projectRoot, "output", `${localSlug}-canvas.png`);
+  const debugPath = path.join(projectRoot, "output", `${localSlug}-debug.json`);
   await page.screenshot({ path: pagePath, fullPage: true });
   const canvasPngDataUrl = await page.evaluate(() => {
     const canvas = window.__canvas || document.querySelector("canvas");
@@ -85,7 +87,9 @@ async function applyViewAndShot(page, view, localSlug) {
   if (shotStat.size < 5000) {
     throw new Error(`Screenshot too small (${shotStat.size} bytes), render likely failed`);
   }
-  return { pagePath, canvasPath };
+  const debugState = await page.evaluate(() => window.__demoState || null);
+  fs.writeFileSync(debugPath, JSON.stringify(debugState, null, 2));
+  return { pagePath, canvasPath, debugPath };
 }
 
 const mime = {
@@ -151,6 +155,7 @@ try {
   const search = new URLSearchParams();
   if (debugMode) search.set("debug", "1");
   if (scene) search.set("scene", scene);
+  if (preset) search.set("preset", preset);
   if (hour !== null) search.set("binaryHour", String(hour));
   if (hourRate !== null) search.set("binaryHourRate", String(hourRate));
   if (latitude !== null) search.set("binaryLat", String(latitude));
@@ -220,6 +225,7 @@ try {
   for (const out of outputs) {
     console.log(`Canvas screenshot: ${out.canvasPath}`);
     console.log(`Page screenshot: ${out.pagePath}`);
+    console.log(`Debug dump: ${out.debugPath}`);
   }
 } finally {
   if (browser) await browser.close();

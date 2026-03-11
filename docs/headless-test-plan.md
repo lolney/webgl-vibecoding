@@ -9,6 +9,8 @@ Validate critical behaviors for:
 - Binary external scene readability + UI
 - Binary surface POV physical consistency + schematic correctness
 - Sun-track camera behavior
+- Shared preset/url reproducibility
+- Headless debug sidecar output
 
 ## Test Cases
 
@@ -78,6 +80,20 @@ Validate critical behaviors for:
   - solar altitude changes smoothly
   - no orbital-state reset when `time24` wraps from `23:xx` to `00:xx`
 
+9. Preset matrix remains reproducible
+- Command:
+  - `npm run headless:matrix`
+- Expected:
+  - each preset emits page/canvas/debug artifacts
+  - preset-specific scene and mode labels match expected state
+
+10. Debug JSON sidecar is emitted for headless runs
+- Command:
+  - `node scripts/headless-render.mjs --scene=binarySurface --preset=surface-sunrise --name=test-debug-dump`
+- Expected:
+  - `output/test-debug-dump-debug.json` exists
+  - dump includes scene, preset, camera, time, and solar-altitude state
+
 ## Results
 
 1. Clocktower hides time badge: `PASS`
@@ -126,3 +142,12 @@ Validate critical behaviors for:
   - `binarySimulationDays` advances from `0.9933` to `1.0146` to `1.0426` while `time24` wraps from `23:50` to `00:21` to `01:01`
   - corresponding solar altitudes continue smoothly from `-78.36` to `-77.47` to `-71.00` degrees
   - no orbital-state reset was observed at midnight wrap
+
+9. Preset matrix reproducibility: `PASS`
+- Evidence (`output/matrix-*.png`, `output/matrix-*.json`):
+  - all configured preset cases completed without renderer failure
+  - scene labels, preset labels, and debug state align with routed preset state
+
+10. Debug sidecar output: `PASS`
+- Evidence (`output/*-debug.json`):
+  - each headless render now writes a JSON dump containing `scene`, `activePresetKey`, `cameraPos`, `cameraTarget`, `binaryDayHours`, and solar-altitude fields where applicable

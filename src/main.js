@@ -14,37 +14,42 @@ import { binaryExternalScene } from "./scenes/binaryExternalScene.js";
 import { binarySurfaceScene } from "./scenes/binarySurfaceScene.js";
 import { createSceneManager } from "./scenes/sceneManager.js";
 import { createHudPrimitive } from "./ui/hudPrimitive.js";
+import { createDiagnosticsPanel } from "./ui/diagnosticsPanel.js";
 import { createOrbitSchematic } from "./ui/orbitSchematic.js";
 import { createViewerSchematic } from "./ui/viewerSchematic.js";
 import { updateBinaryScene } from "./scenes/controllers/binarySceneController.js";
 import { updateClocktowerScene } from "./scenes/controllers/clocktowerSceneController.js";
 import { applySceneModeInternal } from "./scenes/controllers/sceneModeController.js";
 import { computeBinarySimulationState } from "./scenes/shared/orbital.js";
+import {
+  binaryDefaultSimulationDays,
+  binaryDefaultStartHour,
+  binaryTimeMultipliers,
+  buildUrlFromState,
+  coerceTimeMultiplier,
+  getPresetsForScene,
+  readBinaryUrlState,
+  resolveInitialBinaryState,
+} from "./scenes/shared/binaryState.js";
 
 const canvas = document.getElementById("gl");
 const audioButton = document.getElementById("audioToggle");
 const hud = createHudPrimitive();
+const diagnosticsPanel = createDiagnosticsPanel();
 const orbitSchematic = createOrbitSchematic();
 const viewerSchematic = createViewerSchematic();
 const {
   sceneChooser,
+  presetChooser,
   modeBadge,
   timeIndicator,
   timeRateButton,
 } = hud.elements;
 const query = new URLSearchParams(window.location.search);
 const debugView = query.get("debug") === "1";
-const initialSceneQuery = query.get("scene");
-const readNumberParam = (key) => {
-  const raw = query.get(key);
-  if (raw === null || raw === "") return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-const binaryHourQuery = readNumberParam("binaryHour");
-const binaryHourRateQuery = readNumberParam("binaryHourRate");
-const binaryLatQuery = readNumberParam("binaryLat");
-const binaryLonQuery = readNumberParam("binaryLon");
+const initialUrlState = readBinaryUrlState(query);
+const initialSceneQuery = initialUrlState.scene;
+const resolvedInitialBinaryState = resolveInitialBinaryState(initialUrlState);
 
 const renderer = new THREE.WebGLRenderer({
   canvas,
@@ -249,10 +254,18 @@ moonVisual.add(moonHalo);
 
 const stars = new THREE.Points(
   new THREE.BufferGeometry(),
-  new THREE.PointsMaterial({ color: 0x8bc6ff, size: 0.05, transparent: true, opacity: 0.86 }),
+  new THREE.PointsMaterial({
+    color: 0x8bc6ff,
+    size: 0.05,
+    transparent: true,
+    opacity: 0.86,
+    vertexColors: true,
+    sizeAttenuation: true,
+  }),
 );
 const starCount = 2200;
 const starPositions = new Float32Array(starCount * 3);
+const starColors = new Float32Array(starCount * 3);
 for (let i = 0; i < starCount; i += 1) {
   const r = 26 + Math.random() * 20;
   const a = Math.random() * Math.PI * 2;
@@ -260,9 +273,49 @@ for (let i = 0; i < starCount; i += 1) {
   starPositions[i * 3] = Math.cos(a) * r;
   starPositions[i * 3 + 1] = y;
   starPositions[i * 3 + 2] = Math.sin(a) * r;
+  const tint = Math.random();
+  starColors[i * 3] = THREE.MathUtils.lerp(0.45, 1.0, tint);
+  starColors[i * 3 + 1] = THREE.MathUtils.lerp(0.58, 0.9, 1 - tint * 0.35);
+  starColors[i * 3 + 2] = 1.0;
 }
 stars.geometry.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+stars.geometry.setAttribute("color", new THREE.BufferAttribute(starColors, 3));
 scene.add(stars);
+
+const nebulaShell = new THREE.Mesh(
+  new THREE.SphereGeometry(92, 40, 28),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    transparent: true,
+    depthWrite: false,
+    uniforms: {
+      uOpacity: { value: 0.18 },
+    },
+    vertexShader: `
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uOpacity;
+      varying vec3 vDir;
+      void main() {
+        float haze = 0.5 + 0.5 * sin(vDir.x * 7.0 + vDir.z * 5.0);
+        float band = 0.5 + 0.5 * sin(vDir.y * 10.0 - vDir.x * 4.0);
+        float cloud = smoothstep(0.56, 0.96, haze * 0.6 + band * 0.4);
+        vec3 colA = vec3(0.03, 0.08, 0.18);
+        vec3 colB = vec3(0.06, 0.12, 0.28);
+        vec3 colC = vec3(0.02, 0.06, 0.14);
+        vec3 col = mix(colA, colB, cloud);
+        col = mix(col, colC, smoothstep(-0.15, 0.5, vDir.y));
+        gl_FragColor = vec4(col, cloud * uOpacity);
+      }
+    `,
+  }),
+);
+scene.add(nebulaShell);
 
 const binarySystemGroup = new THREE.Group();
 binarySystemGroup.visible = false;
@@ -1344,22 +1397,24 @@ const sceneByKey = Object.fromEntries(sceneDefinitions.map((sceneDef) => [sceneD
 const sceneLabels = Object.fromEntries(sceneDefinitions.map((sceneDef) => [sceneDef.key, sceneDef.label]));
 hud.setSceneOptions(sceneDefinitions);
 hud.setTitle("NEON CLOCKTOWER // DEMOSCENE CUT");
-const binaryDefaultStartHour = 6.0;
-const binaryDefaultSimulationDays = 85.35;
-const binaryTimeMultipliers = [1, 2, 4, 8, 16];
-let binaryDayHours = binaryHourQuery !== null ? THREE.MathUtils.euclideanModulo(binaryHourQuery, 24) : binaryDefaultStartHour;
-let binarySimulationDays = binaryHourQuery !== null
-  ? binaryDefaultSimulationDays + ((binaryHourQuery - binaryDefaultStartHour) / 24)
-  : binaryDefaultSimulationDays;
-const binaryHourRateBase = binaryHourRateQuery !== null ? binaryHourRateQuery : 0.12;
-let binaryTimeMultiplier = 1;
-let observerLatitudeDeg = binaryLatQuery !== null ? THREE.MathUtils.clamp(binaryLatQuery, -85, 85) : 0;
-let observerLongitudeDeg = binaryLonQuery !== null ? binaryLonQuery : 0;
+let activePresetKey = resolvedInitialBinaryState.presetKey;
+let binaryDayHours = resolvedInitialBinaryState.binaryDayHours;
+let binarySimulationDays = resolvedInitialBinaryState.binarySimulationDays;
+let binaryHourRateBase = resolvedInitialBinaryState.binaryHourRateBase;
+let binaryTimeMultiplier = resolvedInitialBinaryState.binaryTimeMultiplier;
+let observerLatitudeDeg = THREE.MathUtils.clamp(resolvedInitialBinaryState.observerLatitudeDeg, -85, 85);
+let observerLongitudeDeg = resolvedInitialBinaryState.observerLongitudeDeg;
+let diagnosticsVisible = resolvedInitialBinaryState.diagnosticsVisible || debugView;
+let pendingInitialOrbitView = resolvedInitialBinaryState.orbitView;
 const surfaceObserverAnchor = new THREE.Vector3();
 const surfaceLookDir = new THREE.Vector3(0, 0.04, 1).normalize();
-let surfaceViewDistance = 13.2;
+const surfaceViewDistanceMin = 11.8;
+const surfaceViewDistanceMax = 13.2;
+const surfacePitchMin = -0.12;
+const surfacePitchMax = 1.12;
+let surfaceViewDistance = 12.4;
 let surfaceYaw = 0;
-let surfacePitch = -0.08;
+let surfacePitch = -0.02;
 let lastTickTime = 0;
 
 function wrapAngle(angle) {
@@ -1388,11 +1443,15 @@ function updateSurfaceCamera(cinematicMix = 0) {
   const orbit = getSurfaceObserverState();
   if (cinematicMix > 0.001) {
     const targetYaw = Math.atan2(orbit.primaryLocalDir.x, orbit.primaryLocalDir.z);
-    const targetPitch = Math.asin(THREE.MathUtils.clamp(orbit.primaryLocalDir.y, -1, 1));
+    const targetPitch = THREE.MathUtils.clamp(
+      Math.asin(THREE.MathUtils.clamp(orbit.primaryLocalDir.y, -1, 1)) * 0.72 - 0.02,
+      surfacePitchMin,
+      surfacePitchMax,
+    );
     surfaceYaw = lerpAngle(surfaceYaw, targetYaw, cinematicMix * 0.14);
     surfacePitch = THREE.MathUtils.lerp(surfacePitch, targetPitch, cinematicMix * 0.14);
   }
-  surfacePitch = THREE.MathUtils.clamp(surfacePitch, -0.28, 1.22);
+  surfacePitch = THREE.MathUtils.clamp(surfacePitch, surfacePitchMin, surfacePitchMax);
   const cosPitch = Math.cos(surfacePitch);
   surfaceLookDir
     .set(
@@ -1427,17 +1486,7 @@ function setBinaryClockHours(hours, options = {}) {
 }
 
 function setBinaryTimeMultiplier(mult) {
-  if (!Number.isFinite(mult)) return;
-  let nextMultiplier = binaryTimeMultipliers[0];
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const candidate of binaryTimeMultipliers) {
-    const distance = Math.abs(candidate - mult);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      nextMultiplier = candidate;
-    }
-  }
-  binaryTimeMultiplier = nextMultiplier;
+  binaryTimeMultiplier = coerceTimeMultiplier(mult);
   updateTimeRateLabel();
 }
 
@@ -1448,17 +1497,70 @@ function format24Hour(hoursValue) {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
+function getRuntimeUrlState(overrides = {}) {
+  return {
+    scene: overrides.scene || activeSceneKey,
+    preset: Object.prototype.hasOwnProperty.call(overrides, "preset") ? overrides.preset : activePresetKey,
+    binaryHour: Object.prototype.hasOwnProperty.call(overrides, "binaryHour") ? overrides.binaryHour : binaryDayHours,
+    binaryLat: Object.prototype.hasOwnProperty.call(overrides, "binaryLat") ? overrides.binaryLat : observerLatitudeDeg,
+    binaryLon: Object.prototype.hasOwnProperty.call(overrides, "binaryLon") ? overrides.binaryLon : observerLongitudeDeg,
+    binaryHourRate: binaryHourRateBase,
+    timeMultiplier: Object.prototype.hasOwnProperty.call(overrides, "timeMultiplier") ? overrides.timeMultiplier : binaryTimeMultiplier,
+    cinematic: Object.prototype.hasOwnProperty.call(overrides, "cinematic") ? overrides.cinematic : cinematic,
+    diagnostics: Object.prototype.hasOwnProperty.call(overrides, "diagnostics") ? overrides.diagnostics : diagnosticsVisible,
+  };
+}
+
 function syncSceneToUrl(sceneKey, options = {}) {
   const { pushHistory = false } = options;
-  const url = new URL(window.location.href);
-  const currentScene = url.searchParams.get("scene");
-  if (currentScene === sceneKey) return;
-  url.searchParams.set("scene", sceneKey);
+  const url = buildUrlFromState(new URL(window.location.href), getRuntimeUrlState({ scene: sceneKey }));
   if (pushHistory) {
     window.history.pushState({ scene: sceneKey }, "", url);
   } else {
     window.history.replaceState({ scene: sceneKey }, "", url);
   }
+}
+
+function applyBinaryPreset(presetKey, options = {}) {
+  const { syncUrl = true, pushHistory = false } = options;
+  const preset = getPresetsForScene(activeSceneKey).find((entry) => entry.key === presetKey);
+  if (!preset) return;
+  activePresetKey = preset.key;
+  if (Number.isFinite(preset.state.binaryDayHours)) {
+    setBinaryClockHours(preset.state.binaryDayHours, { preserveContinuity: false });
+  }
+  if (Number.isFinite(preset.state.simulationDays)) {
+    binarySimulationDays = preset.state.simulationDays;
+  }
+  if (Number.isFinite(preset.state.latitudeDeg)) {
+    observerLatitudeDeg = THREE.MathUtils.clamp(preset.state.latitudeDeg, -85, 85);
+  }
+  if (Number.isFinite(preset.state.longitudeDeg)) {
+    observerLongitudeDeg = preset.state.longitudeDeg;
+  }
+  if (Number.isFinite(preset.state.multiplier)) {
+    setBinaryTimeMultiplier(preset.state.multiplier);
+  }
+  if (typeof preset.state.cinematic === "boolean") {
+    setCinematic(preset.state.cinematic);
+  }
+  if (activeSceneKey === "binarySurface") {
+    surfaceObserverAnchor.set(0, 1.42, 0);
+    const orbit = getSurfaceObserverState();
+    surfaceYaw = Math.atan2(orbit.primaryLocalDir.x, orbit.primaryLocalDir.z);
+    surfacePitch = THREE.MathUtils.clamp(
+      Number.isFinite(preset.state.surfacePitch)
+        ? preset.state.surfacePitch
+        : (Math.asin(THREE.MathUtils.clamp(orbit.primaryLocalDir.y, -1, 1)) * 0.5 - 0.03),
+      surfacePitchMin,
+      surfacePitchMax,
+    );
+    updateSurfaceCamera(0);
+  } else if (preset.state.orbitView && typeof window.__setOrbitView === "function") {
+    window.__setOrbitView(preset.state.orbitView);
+  }
+  hud.setPreset(activePresetKey);
+  if (syncUrl) syncSceneToUrl(activeSceneKey, { pushHistory });
 }
 
 const clocktowerObjects = [
@@ -1485,8 +1587,15 @@ const clocktowerObjects = [
 const binaryObjects = [binarySystemGroup, starAGroup, starBGroup, planetOrbitLine, binaryBaryOrbit, surfacePovGroup];
 
 function applySceneMode(nextSceneKey, options = {}) {
+  const requestedSceneKey = sceneByKey[nextSceneKey] ? nextSceneKey : "clocktower";
+  const presetOptions = getPresetsForScene(requestedSceneKey);
+  hud.setPresetOptions(presetOptions);
+  if (!presetOptions.some((preset) => preset.key === activePresetKey)) {
+    activePresetKey = "";
+  }
+  hud.setPreset(activePresetKey);
   activeSceneKey = applySceneModeInternal({
-    nextSceneKey,
+    nextSceneKey: requestedSceneKey,
     options,
     sceneManager,
     sceneByKey,
@@ -1513,10 +1622,14 @@ function applySceneMode(nextSceneKey, options = {}) {
   });
   if (activeSceneKey === "binarySurface") {
     surfaceObserverAnchor.set(0, 1.42, 0);
-    surfaceViewDistance = 13.2;
+    surfaceViewDistance = 12.4;
     const orbit = getSurfaceObserverState();
     surfaceYaw = Math.atan2(orbit.primaryLocalDir.x, orbit.primaryLocalDir.z);
-    surfacePitch = -0.08;
+    surfacePitch = THREE.MathUtils.clamp(
+      Math.asin(THREE.MathUtils.clamp(orbit.primaryLocalDir.y, -1, 1)) * 0.5 - 0.03,
+      -0.06,
+      0.16,
+    );
     updateSurfaceCamera(0);
   }
   controls.enabled = activeSceneKey !== "binarySurface";
@@ -1528,6 +1641,10 @@ function applySceneMode(nextSceneKey, options = {}) {
   if (timeRateButton) {
     timeRateButton.style.display = activeSceneKey === "binarySurface" ? "inline-block" : "none";
   }
+  if (presetChooser) {
+    presetChooser.style.display = activeSceneKey === "clocktower" ? "none" : "inline-block";
+  }
+  diagnosticsPanel.setVisible(diagnosticsVisible);
 }
 
 function createSynth() {
@@ -1756,20 +1873,23 @@ const sectionNames = ["Pulse Forge", "Hyper Lift", "Night Glide", "Strobe Core"]
 function setCinematic(on) {
   cinematic = on;
   if (activeSceneKey === "binarySurface") {
-    modeBadge.textContent = on ? "Sun-Track Camera // Planet POV" : "Manual Horizon Camera // Planet POV";
+    modeBadge.textContent = on ? "Sun Track // Planet POV" : "Free Look // Planet POV";
     return;
   }
   if (activeSceneKey === "binaryExternal") {
-    modeBadge.textContent = on ? "Cinematic Orbit Camera // Binary External" : "Manual Orbit Camera // Binary External";
+    modeBadge.textContent = on ? "Cinematic Orbit // System View" : "Free Orbit // System View";
     return;
   }
-  const camText = on ? "Cinematic Camera" : "Manual Camera";
+  const camText = on ? "Cinematic Orbit" : "Free Orbit";
   const sectionText = currentSection >= 0 ? sectionNames[currentSection] : "Boot";
   modeBadge.textContent = `${camText} // ${sectionText}`;
 }
 
-setCinematic(false);
-applySceneMode(sceneByKey[initialSceneQuery] ? initialSceneQuery : "clocktower");
+setCinematic(resolvedInitialBinaryState.cinematic);
+applySceneMode(sceneByKey[initialSceneQuery] ? initialSceneQuery : resolvedInitialBinaryState.scene);
+if (activePresetKey) {
+  applyBinaryPreset(activePresetKey, { syncUrl: false });
+}
 if (debugView) {
   modeBadge.textContent = "Debug Camera // Geometry";
 }
@@ -1784,6 +1904,8 @@ let surfacePointerLastY = 0;
 
 renderer.domElement.addEventListener("pointerdown", (e) => {
   markInteraction();
+  activePresetKey = "";
+  hud.setPreset("");
   if (cinematic) setCinematic(false);
   if (activeSceneKey === "binarySurface") {
     surfacePointerId = e.pointerId;
@@ -1800,7 +1922,7 @@ window.addEventListener("pointermove", (e) => {
   surfacePointerLastX = e.clientX;
   surfacePointerLastY = e.clientY;
   surfaceYaw -= dx * 0.0052;
-  surfacePitch = THREE.MathUtils.clamp(surfacePitch - dy * 0.0038, -0.28, 1.46);
+  surfacePitch = THREE.MathUtils.clamp(surfacePitch - dy * 0.0032, surfacePitchMin, surfacePitchMax);
   markInteraction();
 });
 function releaseSurfacePointer(e) {
@@ -1811,7 +1933,13 @@ window.addEventListener("pointerup", releaseSurfacePointer);
 window.addEventListener("pointercancel", releaseSurfacePointer);
 renderer.domElement.addEventListener("wheel", (e) => {
   if (activeSceneKey === "binarySurface") {
-    surfaceViewDistance = THREE.MathUtils.clamp(surfaceViewDistance + e.deltaY * 0.01, 6, 18);
+    activePresetKey = "";
+    hud.setPreset("");
+    surfaceViewDistance = THREE.MathUtils.clamp(
+      surfaceViewDistance + e.deltaY * 0.008,
+      surfaceViewDistanceMin,
+      surfaceViewDistanceMax,
+    );
     e.preventDefault();
   }
   markInteraction();
@@ -1820,37 +1948,73 @@ renderer.domElement.addEventListener("wheel", (e) => {
 window.addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() === "c") {
     setCinematic(!cinematic);
+    syncSceneToUrl(activeSceneKey);
     markInteraction();
+  }
+  if (e.key.toLowerCase() === "d") {
+    diagnosticsVisible = !diagnosticsVisible;
+    diagnosticsPanel.setVisible(diagnosticsVisible);
+    syncSceneToUrl(activeSceneKey);
   }
 });
 modeBadge.addEventListener("click", () => {
   setCinematic(!cinematic);
+  syncSceneToUrl(activeSceneKey);
   markInteraction();
 });
 if (timeRateButton) {
   updateTimeRateLabel();
   timeRateButton.addEventListener("click", () => {
+    activePresetKey = "";
+    hud.setPreset("");
     const currentIndex = binaryTimeMultipliers.indexOf(binaryTimeMultiplier);
     const nextIndex = (currentIndex + 1) % binaryTimeMultipliers.length;
     binaryTimeMultiplier = binaryTimeMultipliers[nextIndex];
     updateTimeRateLabel();
+    syncSceneToUrl(activeSceneKey);
     markInteraction();
   });
 }
 if (sceneChooser) {
   sceneChooser.addEventListener("change", (e) => {
+    activePresetKey = "";
     applySceneMode(e.target.value, { pushHistory: true });
     markInteraction();
   });
 }
+if (presetChooser) {
+  presetChooser.addEventListener("change", (e) => {
+    const nextPreset = e.target.value;
+    if (!nextPreset) {
+      activePresetKey = "";
+      syncSceneToUrl(activeSceneKey);
+      return;
+    }
+    applyBinaryPreset(nextPreset, { pushHistory: true });
+    markInteraction();
+  });
+}
 window.addEventListener("popstate", () => {
-  const fromUrl = new URLSearchParams(window.location.search).get("scene");
-  applySceneMode(sceneByKey[fromUrl] ? fromUrl : "clocktower", { syncUrl: false });
+  const nextState = resolveInitialBinaryState(readBinaryUrlState(new URLSearchParams(window.location.search)));
+  activePresetKey = nextState.presetKey;
+  binaryDayHours = nextState.binaryDayHours;
+  binarySimulationDays = nextState.binarySimulationDays;
+  binaryHourRateBase = nextState.binaryHourRateBase;
+  observerLatitudeDeg = THREE.MathUtils.clamp(nextState.observerLatitudeDeg, -85, 85);
+  observerLongitudeDeg = nextState.observerLongitudeDeg;
+  binaryTimeMultiplier = nextState.binaryTimeMultiplier;
+  diagnosticsVisible = nextState.diagnosticsVisible || debugView;
+  applySceneMode(sceneByKey[nextState.scene] ? nextState.scene : "clocktower", { syncUrl: false });
+  setCinematic(nextState.cinematic);
+  if (activePresetKey) applyBinaryPreset(activePresetKey, { syncUrl: false });
+  diagnosticsPanel.setVisible(diagnosticsVisible);
 });
 
 window.__demoState = { ok: true, frames: 0, lastTime: 0, debug: {} };
 window.__canvas = canvas;
 window.__setBinaryTime = (hours) => {
+  activePresetKey = "";
+  hud.setPreset("");
   setBinaryClockHours(hours, { preserveContinuity: true });
   if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
 };
@@ -1858,22 +2022,41 @@ window.__getBinaryTime = () => binaryDayHours;
 window.__getBinarySimulationDays = () => binarySimulationDays;
 window.__setObserverLatitude = (latDeg) => {
   if (!Number.isFinite(latDeg)) return;
+  activePresetKey = "";
+  hud.setPreset("");
   observerLatitudeDeg = THREE.MathUtils.clamp(latDeg, -85, 85);
   if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
 };
 window.__getObserverLatitude = () => observerLatitudeDeg;
 window.__setObserverLongitude = (lonDeg) => {
   if (!Number.isFinite(lonDeg)) return;
+  activePresetKey = "";
+  hud.setPreset("");
   observerLongitudeDeg = lonDeg;
   if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
 };
 window.__getObserverLongitude = () => observerLongitudeDeg;
 window.__setTimeMultiplier = (mult) => {
+  activePresetKey = "";
+  hud.setPreset("");
   setBinaryTimeMultiplier(mult);
 };
 window.__getTimeMultiplier = () => binaryTimeMultiplier;
+window.__setBinaryHourRate = (rate) => {
+  if (!Number.isFinite(rate)) return;
+  binaryHourRateBase = rate;
+};
+window.__getBinaryHourRate = () => binaryHourRateBase;
 window.__setScene = (sceneKey) => {
+  activePresetKey = "";
   applySceneMode(sceneByKey[sceneKey] ? sceneKey : "clocktower");
+};
+window.__setPreset = (presetKey) => {
+  applyBinaryPreset(presetKey, { syncUrl: false });
+};
+window.__setDiagnosticsVisible = (visible) => {
+  diagnosticsVisible = Boolean(visible);
+  diagnosticsPanel.setVisible(diagnosticsVisible);
 };
 window.__setOrbitView = (view = {}) => {
   const azimuth = Number.isFinite(view.azimuth) ? view.azimuth : 0;
@@ -1891,9 +2074,11 @@ window.__setOrbitView = (view = {}) => {
   );
   const offset = new THREE.Vector3().setFromSpherical(s);
   if (activeSceneKey === "binarySurface") {
+    activePresetKey = "";
+    hud.setPreset("");
     surfaceViewDistance = clampedDistance;
     surfaceYaw = azimuth;
-    surfacePitch = THREE.MathUtils.clamp((Math.PI / 2) - polar, -0.28, 1.22);
+    surfacePitch = THREE.MathUtils.clamp((Math.PI / 2) - polar, surfacePitchMin, surfacePitchMax);
     updateSurfaceCamera(0);
   } else {
     controls.target.set(tx, ty, tz);
@@ -1908,6 +2093,10 @@ window.__setOrbitView = (view = {}) => {
     target: controls.target.toArray(),
   };
 };
+if (pendingInitialOrbitView && activeSceneKey === "binaryExternal") {
+  window.__setOrbitView(pendingInitialOrbitView);
+  pendingInitialOrbitView = null;
+}
 
 const clock = new THREE.Clock();
 const tmpColor = new THREE.Color();
@@ -1954,6 +2143,7 @@ const binaryControllerCtx = {
   scene,
   composer,
   stars,
+  nebulaShell,
   sky,
   ambient,
   binaryFill,
@@ -2103,6 +2293,20 @@ function tick() {
     viewerSchematic.render(null);
   }
 
+  diagnosticsPanel.render(diagnosticsVisible ? [
+    `scene ${sceneLabels[activeSceneKey] || activeSceneKey}`,
+    activePresetKey ? `preset ${activePresetKey}` : "preset manual",
+    `camera ${cinematic ? "cinematic" : "manual"}`,
+    `clock ${format24Hour(binaryDayHours)} @ ${binaryTimeMultiplier}x`,
+    `lat ${observerLatitudeDeg.toFixed(1)} lon ${observerLongitudeDeg.toFixed(1)}`,
+    sceneDebug.primaryAltitudeDeg !== undefined
+      ? `sun A alt ${sceneDebug.primaryAltitudeDeg.toFixed(1)} az ${sceneDebug.primaryAzimuthDeg.toFixed(1)}`
+      : "sun A alt --.- az --.-",
+    sceneDebug.secondaryAltitudeDeg !== undefined
+      ? `sun B alt ${sceneDebug.secondaryAltitudeDeg.toFixed(1)} az ${sceneDebug.secondaryAzimuthDeg.toFixed(1)}`
+      : "sun B alt --.- az --.-",
+  ] : []);
+
   window.__demoState.frames += 1;
   window.__demoState.lastTime = t;
   window.__demoState.debug = {
@@ -2117,7 +2321,11 @@ function tick() {
     blenderTower: usingBlenderTower,
     blenderCity: usingBlenderCity,
     debugView,
+    diagnosticsVisible,
+    activePresetKey,
+    cinematic,
     binaryDayHours: Number(binaryDayHours.toFixed(4)),
+    binaryHourRateBase: Number(binaryHourRateBase.toFixed(4)),
     timeMultiplier: binaryTimeMultiplier,
     binarySimulationDays: Number(binarySimulationDays.toFixed(4)),
     observerLatitudeDeg: Number(observerLatitudeDeg.toFixed(2)),

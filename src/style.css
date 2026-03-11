@@ -48,6 +48,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .hud button,
@@ -82,6 +83,13 @@ body {
   text-transform: uppercase;
   font-size: 11px;
   box-shadow: 0 0 18px #66adff55;
+}
+
+#presetChooser {
+  border-color: #83f1de;
+  color: #dffdf9;
+  background: linear-gradient(180deg, #13616b, #0a2730);
+  box-shadow: 0 0 18px #54e8d544;
 }
 
 #timeIndicator {
@@ -171,6 +179,30 @@ body {
   border-top: 1px solid #8ec7ff33;
 }
 
+.diagnostics-panel {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: min(320px, 34vw);
+  min-height: 120px;
+  padding: 12px 14px;
+  border: 1px solid #8ec7ff55;
+  border-radius: 10px;
+  background: rgba(5, 12, 30, 0.82);
+  box-shadow: 0 0 20px #66b8ff22;
+  color: #dff2ff;
+  font: 11px/1.45 "Trebuchet MS", "Segoe UI", sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+  white-space: pre-line;
+  z-index: 5;
+}
+
+.diagnostics-panel.hidden {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .orbit-schematic {
     width: min(280px, 48vw);
@@ -179,5 +211,8 @@ body {
   .viewer-schematic {
     width: min(260px, 45vw);
     height: min(220px, 29vh);
+  }
+  .diagnostics-panel {
+    width: min(280px, 56vw);
   }
 }

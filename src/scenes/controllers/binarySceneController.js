@@ -9,6 +9,7 @@ export function updateBinaryScene(ctx, frame) {
     scene,
     composer,
     stars,
+    nebulaShell,
     sky,
     ambient,
     binaryFill,
@@ -108,17 +109,17 @@ export function updateBinaryScene(ctx, frame) {
       THREE.MathUtils.lerp(0.58, 0.92, daylight),
     );
     scene.fog.color.setRGB(
-      THREE.MathUtils.lerp(0.01, 0.23, daylight),
-      THREE.MathUtils.lerp(0.02, 0.35, daylight),
-      THREE.MathUtils.lerp(0.07, 0.52, daylight),
+      THREE.MathUtils.lerp(0.01, 0.19, daylight),
+      THREE.MathUtils.lerp(0.02, 0.29, daylight),
+      THREE.MathUtils.lerp(0.07, 0.44, daylight),
     );
     scene.background.setRGB(
-      THREE.MathUtils.lerp(0.004, 0.2, daylight),
-      THREE.MathUtils.lerp(0.01, 0.3, daylight),
-      THREE.MathUtils.lerp(0.04, 0.5, daylight),
+      THREE.MathUtils.lerp(0.004, 0.15, daylight),
+      THREE.MathUtils.lerp(0.01, 0.24, daylight),
+      THREE.MathUtils.lerp(0.04, 0.42, daylight),
     );
-    scene.fog.density = THREE.MathUtils.lerp(0.082, 0.03, daylight);
-    renderer.toneMappingExposure = THREE.MathUtils.lerp(0.36, 0.54, daylight) + secondStrength * 0.02;
+    scene.fog.density = THREE.MathUtils.lerp(0.09, 0.038, daylight);
+    renderer.toneMappingExposure = THREE.MathUtils.lerp(0.34, 0.47, daylight) + secondStrength * 0.015;
     stars.material.opacity = THREE.MathUtils.lerp(0.96, 0.12, daylight);
     stars.material.size = THREE.MathUtils.lerp(0.24, 0.06, daylight);
   } else if (isExternalScene) {
@@ -154,14 +155,21 @@ export function updateBinaryScene(ctx, frame) {
   }
 
   if (isExternalScene) {
-    const autoAngleBinary = t * 0.11;
+    const autoAngleBinary = t * 0.065 + Math.sin(t * 0.08) * 0.24;
     const extAutoPos = new THREE.Vector3(
-      Math.cos(autoAngleBinary) * 32,
-      12 + Math.sin(t * 0.13) * 3,
-      Math.sin(autoAngleBinary) * 32,
+      Math.cos(autoAngleBinary) * 30,
+      10.5 + Math.sin(t * 0.11) * 2.2,
+      Math.sin(autoAngleBinary) * 28,
     );
     camera.position.lerp(extAutoPos, cinematicMix * 0.05);
-    controls.target.lerp(new THREE.Vector3(0, 0, 0), cinematicMix * 0.06);
+    controls.target.lerp(
+      new THREE.Vector3(
+        Math.sin(t * 0.09) * 1.1,
+        Math.sin(t * 0.05) * 0.55,
+        Math.cos(t * 0.07) * 0.8,
+      ),
+      cinematicMix * 0.06,
+    );
   } else {
     if (camera.position.y < 1.0) camera.position.y = 1.0;
     camera.up.set(0, 1, 0);
@@ -202,23 +210,23 @@ export function updateBinaryScene(ctx, frame) {
     surfaceOcean.material.uniforms.time.value = t * 0.34;
     surfaceOcean.material.uniforms.sunDirection.value.copy(surfaceSunDir);
     surfaceOcean.material.uniforms.sunColor.value.setRGB(
-      THREE.MathUtils.lerp(0.16, 0.28, dayStrength),
-      THREE.MathUtils.lerp(0.18, 0.3, dayStrength),
-      THREE.MathUtils.lerp(0.2, 0.32, dayStrength),
+      THREE.MathUtils.lerp(0.12, 0.19, dayStrength),
+      THREE.MathUtils.lerp(0.14, 0.22, dayStrength),
+      THREE.MathUtils.lerp(0.18, 0.26, dayStrength),
     );
-    surfaceOcean.material.uniforms.distortionScale.value = THREE.MathUtils.lerp(0.7, 1.2, horizonBoost);
-    surfaceOcean.material.uniforms.size.value = 3.4;
-    surfaceOcean.material.uniforms.waterColor.value.set(daylight > 0.35 ? 0x0b2238 : 0x07162a);
+    surfaceOcean.material.uniforms.distortionScale.value = THREE.MathUtils.lerp(0.48, 0.9, horizonBoost);
+    surfaceOcean.material.uniforms.size.value = THREE.MathUtils.lerp(2.2, 2.8, horizonBoost);
+    surfaceOcean.material.uniforms.waterColor.value.set(daylight > 0.35 ? 0x0a2742 : 0x07162a);
     surfaceFarOcean.material.uniforms.time.value = t * 0.24 + 8.0;
     surfaceFarOcean.material.uniforms.sunDirection.value.copy(surfaceSunDir);
     surfaceFarOcean.material.uniforms.sunColor.value.setRGB(
-      THREE.MathUtils.lerp(0.18, 0.34, dayStrength),
-      THREE.MathUtils.lerp(0.2, 0.36, dayStrength),
-      THREE.MathUtils.lerp(0.24, 0.42, dayStrength),
+      THREE.MathUtils.lerp(0.14, 0.24, dayStrength),
+      THREE.MathUtils.lerp(0.16, 0.28, dayStrength),
+      THREE.MathUtils.lerp(0.2, 0.34, dayStrength),
     );
-    surfaceFarOcean.material.uniforms.distortionScale.value = THREE.MathUtils.lerp(1.0, 1.7, horizonBoost);
-    surfaceFarOcean.material.uniforms.size.value = 4.2;
-    surfaceFarOcean.material.uniforms.waterColor.value.set(daylight > 0.35 ? 0x112f49 : 0x0a1d35);
+    surfaceFarOcean.material.uniforms.distortionScale.value = THREE.MathUtils.lerp(0.72, 1.2, horizonBoost);
+    surfaceFarOcean.material.uniforms.size.value = THREE.MathUtils.lerp(2.8, 3.6, horizonBoost);
+    surfaceFarOcean.material.uniforms.waterColor.value.set(daylight > 0.35 ? 0x103654 : 0x0a1d35);
 
     // Explicit sun billboards keep the solar motion readable in the local sky frame.
     surfaceSunA.group.visible = primaryVisible;
@@ -230,8 +238,8 @@ export function updateBinaryScene(ctx, frame) {
       surfaceSunA.group.position.copy(camera.position).add(primaryLocalDir.clone().multiplyScalar(86));
       surfaceSunA.group.lookAt(camera.position);
       surfaceSunA.glow.visible = true;
-      surfaceSunA.glow.material.uniforms.uStrength.value = 0.36 + dayStrength * 0.34;
-      surfaceSunA.group.scale.setScalar(1.7 + (1 - sunHeight01) * 0.55);
+      surfaceSunA.glow.material.uniforms.uStrength.value = 0.22 + (1 - sunHeight01) * 0.28 + dayStrength * 0.08;
+      surfaceSunA.group.scale.setScalar(1.08 + (1 - sunHeight01) * 0.42);
 
       const primaryAhead = Math.max(0, primaryLocalDir.dot(surfaceForward));
       const primaryRight = primaryLocalDir.dot(surfaceRight);
@@ -243,8 +251,8 @@ export function updateBinaryScene(ctx, frame) {
           .add(surfaceRight.clone().multiplyScalar(primaryRight * 26));
         surfaceReflectionA.position.y = camera.position.y - 1.76;
         surfaceReflectionA.rotation.set(-Math.PI / 2, 0, -primaryRight * 0.16);
-        surfaceReflectionA.scale.set(0.6, 0.52, 1);
-        surfaceReflectionA.material.opacity = 0.015 + primaryReflection * 0.08;
+        surfaceReflectionA.scale.set(0.42, 0.34, 1);
+        surfaceReflectionA.material.opacity = 0.008 + primaryReflection * 0.035;
       }
     }
 
@@ -252,8 +260,8 @@ export function updateBinaryScene(ctx, frame) {
       surfaceSunB.group.position.copy(camera.position).add(secondaryLocalDir.clone().multiplyScalar(82));
       surfaceSunB.group.lookAt(camera.position);
       surfaceSunB.glow.visible = true;
-      surfaceSunB.glow.material.uniforms.uStrength.value = 0.22 + secondStrength * 0.28;
-      surfaceSunB.group.scale.setScalar(1.35 + (1 - sunHeight01) * 0.44);
+      surfaceSunB.glow.material.uniforms.uStrength.value = 0.14 + (1 - sunHeight01) * 0.18 + secondStrength * 0.08;
+      surfaceSunB.group.scale.setScalar(0.94 + (1 - sunHeight01) * 0.3);
 
       const secondaryAhead = Math.max(0, secondaryLocalDir.dot(surfaceForward));
       const secondaryRight = secondaryLocalDir.dot(surfaceRight);
@@ -265,15 +273,15 @@ export function updateBinaryScene(ctx, frame) {
           .add(surfaceRight.clone().multiplyScalar(secondaryRight * 22));
         surfaceReflectionB.position.y = camera.position.y - 1.77;
         surfaceReflectionB.rotation.set(-Math.PI / 2, 0, -secondaryRight * 0.14);
-        surfaceReflectionB.scale.set(0.58, 0.46, 1);
-        surfaceReflectionB.material.opacity = 0.01 + secondaryReflection * 0.06;
+        surfaceReflectionB.scale.set(0.38, 0.3, 1);
+        surfaceReflectionB.material.opacity = 0.006 + secondaryReflection * 0.028;
       }
     }
 
     binaryStarALight.position.copy(camera.position).add(primaryLocalDir.clone().multiplyScalar(90));
     binaryStarBLight.position.copy(camera.position).add(secondaryLocalDir.clone().multiplyScalar(84));
-    binaryStarALight.intensity = 18 + dayStrength * (92 + (1 - sunHeight01) * 56);
-    binaryStarBLight.intensity = 4 + secondStrength * (52 + (1 - sunHeight01) * 40);
+    binaryStarALight.intensity = 18 + dayStrength * (70 + (1 - sunHeight01) * 34);
+    binaryStarBLight.intensity = 4 + secondStrength * (38 + (1 - sunHeight01) * 24);
     binaryFill.intensity = 0.08 + dayStrength * 0.32 + secondStrength * 0.24;
 
     surfaceGround.material.color.setRGB(
@@ -289,12 +297,14 @@ export function updateBinaryScene(ctx, frame) {
   }
 
   stars.rotation.y = t * 0.004;
+  nebulaShell.rotation.y = -t * 0.0025;
+  nebulaShell.material.uniforms.uOpacity.value = isExternalScene ? 0.2 : (isSurfaceScene ? 0.08 : 0.14);
   sky.rotation.y = -t * 0.003;
   if (isSurfaceScene) {
     const horizonBoost = 1 - sunHeight01;
-    bloomPass.strength = 0.012 + horizonBoost * 0.026 + secondStrength * 0.02 + beat * 0.015;
-    bloomPass.radius = 0.04 + horizonBoost * 0.025 + secondStrength * 0.014;
-    bloomPass.threshold = THREE.MathUtils.lerp(0.998, 0.975, horizonBoost);
+    bloomPass.strength = 0.006 + horizonBoost * 0.016 + secondStrength * 0.012 + beat * 0.008;
+    bloomPass.radius = 0.02 + horizonBoost * 0.018 + secondStrength * 0.012;
+    bloomPass.threshold = THREE.MathUtils.lerp(0.9995, 0.986, horizonBoost);
   } else if (isExternalScene) {
     bloomPass.strength = 0.24 + beat * 0.05;
     bloomPass.radius = 0.14;
@@ -331,6 +341,8 @@ export function updateBinaryScene(ctx, frame) {
       viewerDir: [orbit.viewerDir.x, orbit.viewerDir.y],
       combinedStarDir: [orbit.combinedStarDir.x, orbit.combinedStarDir.y],
       viewerLightDot: orbit.viewerLightDot,
+      primaryAltitudeDeg: THREE.MathUtils.radToDeg(orbit.primaryAltitude),
+      secondaryAltitudeDeg: THREE.MathUtils.radToDeg(orbit.secondaryAltitude),
       viewerTurnYaw: orbit.viewerTurnYaw,
       spinYaw: orbit.spinYaw,
       viewerYaw: orbit.viewerYaw,

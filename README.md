@@ -56,6 +56,15 @@ npm run headless
 ```
 
 A canvas and full-page screenshot are written to `output/`.
+Each run also writes a debug sidecar JSON with the current simulation/camera state.
+
+## Headless preset matrix
+
+Runs a fixed regression sweep across the major scenes and presets:
+
+```bash
+npm run headless:matrix
+```
 
 Examples:
 
@@ -73,14 +82,27 @@ node scripts/headless-render.mjs \
   --distance=34 \
   --target-x=0 --target-y=0 --target-z=0 \
   --name=ext-angle
+
+# Named preset routed through shared scene state
+node scripts/headless-render.mjs \
+  --scene=binarySurface \
+  --preset=surface-second-sun \
+  --name=surface-second-sun
 ```
 
 Useful flags:
 
 - `--scene=clocktower|binaryExternal|binarySurface`
+- `--preset=<preset-key>`
 - `--hour=<0-24>` and `--hour-rate=<float>`
 - `--azimuth`, `--polar`, `--distance`
 - `--target-x`, `--target-y`, `--target-z`
 - `--wait-ms=<milliseconds>`
 - `--debug` (disables post-processing)
 - `--sweep-azimuth=0,90,180,270` (takes multiple angle shots in one run; values can be degrees or radians)
+
+## Runtime controls
+
+- `C`: toggle cinematic camera
+- `D`: toggle diagnostics overlay
+- Preset chooser: jump to reproducible scene states with URL sync

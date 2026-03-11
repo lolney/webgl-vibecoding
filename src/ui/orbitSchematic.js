@@ -74,6 +74,8 @@ export function createOrbitSchematic({ root = document } = {}) {
     const viewerDir = data.viewerDir;
     const combinedStarDir = data.combinedStarDir;
     const viewerLightDot = Number(data.viewerLightDot) || 0;
+    const primaryAltitudeDeg = Number(data.primaryAltitudeDeg) || 0;
+    const secondaryAltitudeDeg = Number(data.secondaryAltitudeDeg) || 0;
     const orbitalR = Math.max(0.001, Number(data.orbitRadius) || 1);
     const dynamicR = Math.max(
       orbitalR,
@@ -122,6 +124,13 @@ export function createOrbitSchematic({ root = document } = {}) {
     body(sxA, syA, 6.8, "#fff3c6", "rgba(255, 194, 86, 0.7)");
     body(sxB, syB, 5.8, "#dbe8ff", "rgba(121, 168, 255, 0.75)");
     body(px0, py0, 4.2, "#8cc2ff", "rgba(62, 122, 255, 0.6)");
+    ctx.fillStyle = "rgba(255, 211, 125, 0.95)";
+    ctx.font = "10px 'Trebuchet MS', sans-serif";
+    ctx.fillText("A", sxA + 9, syA - 8);
+    ctx.fillStyle = "rgba(177, 207, 255, 0.95)";
+    ctx.fillText("B", sxB + 9, syB - 8);
+    ctx.fillStyle = "rgba(160, 214, 255, 0.95)";
+    ctx.fillText("P", px0 + 8, py0 - 8);
 
     const siteOffset = 9.5;
     const siteX = px0 + spinDir[0] * siteOffset;
@@ -166,6 +175,9 @@ export function createOrbitSchematic({ root = document } = {}) {
     ctx.fillText("ORBITAL SCHEMATIC", 10, 16);
     ctx.fillStyle = viewerLightDot > 0 ? "rgba(255, 238, 130, 0.95)" : "rgba(142, 188, 255, 0.95)";
     ctx.fillText(viewerLightDot > 0 ? "viewer: day" : "viewer: night", 10, 31);
+    ctx.fillStyle = "rgba(200, 225, 255, 0.85)";
+    ctx.fillText(`sun A alt ${primaryAltitudeDeg.toFixed(1)}°`, 10, 46);
+    ctx.fillText(`sun B alt ${secondaryAltitudeDeg.toFixed(1)}°`, 10, 60);
     ctx.fillStyle = "rgba(185, 225, 255, 0.85)";
     ctx.fillText("site", 12, h - 20);
     ctx.fillStyle = "rgba(255, 186, 92, 0.9)";

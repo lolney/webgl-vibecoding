@@ -18,6 +18,9 @@
           <option value="binaryExternal">Binary System (External)</option>
           <option value="binarySurface">Binary System (Planet POV)</option>
         </select>
+        <select id="presetChooser" aria-label="Scene Preset">
+          <option value="">Preset</option>
+        </select>
         <button id="audioToggle" type="button">Start Audio</button>
         <button id="modeBadge" type="button">Manual Camera</button>
         <span id="timeIndicator">Time --:--</span>
@@ -32,6 +35,7 @@
       <canvas id="viewerSchematicCanvas"></canvas>
       <div id="viewerLatitude">LATITUDE --.-°</div>
     </div>
+    <div id="diagnosticsPanel" class="diagnostics-panel hidden" aria-hidden="true"></div>
 
     <script type="module" src="/src/main.js"></script>
   </body>
