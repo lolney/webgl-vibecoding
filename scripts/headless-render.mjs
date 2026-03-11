@@ -27,6 +27,9 @@ const hourRate = readNumberArg("hour-rate");
 const latitude = readNumberArg("lat");
 const longitude = readNumberArg("lon");
 const timeMultiplier = readNumberArg("time-multiplier");
+const section = readNumberArg("section");
+const beat = readNumberArg("beat");
+const level = readNumberArg("level");
 const azimuth = readNumberArg("azimuth");
 const polar = readNumberArg("polar");
 const distance = readNumberArg("distance");
@@ -168,6 +171,20 @@ try {
         window.__setTimeMultiplier(nextMultiplier);
       }
     }, timeMultiplier);
+  }
+  if (section !== null) {
+    await page.evaluate((nextSection) => {
+      if (typeof window.__setClocktowerSection === "function") {
+        window.__setClocktowerSection(nextSection);
+      }
+    }, section);
+  }
+  if (beat !== null || level !== null) {
+    await page.evaluate((nextDrive) => {
+      if (typeof window.__setAudioDrive === "function") {
+        window.__setAudioDrive(nextDrive);
+      }
+    }, { beat, level });
   }
   await page.waitForTimeout(waitMs);
   const outputs = [];

@@ -107,6 +107,15 @@ Validate critical behaviors for:
   - second-sun preset keeps the primary below horizon and secondary above it
   - night daylight factor is near zero and exposure remains below noon
 
+12. Clocktower lighting override regression remains deterministic
+- Command:
+  - `npm run headless:clocktower-lighting`
+- Expected:
+  - explicit section overrides are reflected in debug state
+  - `Hyper Lift` beam intensity and cone visibility exceed `Night Glide`
+  - `Strobe Core` strobe intensity exceeds `Hyper Lift`
+  - `Strobe Core` exposure compresses below `Hyper Lift`
+
 ## Results
 
 1. Clocktower hides time badge: `PASS`
@@ -173,3 +182,10 @@ Validate critical behaviors for:
   - second sun: `primaryAltitudeDeg=-2.02`, `secondaryAltitudeDeg=13.88`
   - night: `daylightFactor=0`, `exposure=0.29`
   - regression script completed with `Lighting regression OK.`
+
+12. Clocktower lighting override regression: `PASS`
+- Evidence (`npm run headless:clocktower-lighting`, `output/clocktower-*.png`, `output/clocktower-*-debug.json`):
+  - `Hyper Lift`: `beamIntensity=2376.987`, `beamConeOpacity=0.1410`
+  - `Night Glide`: `beamIntensity=1339.280`, `beamConeOpacity=0.0793`
+  - `Strobe Core`: `strobePeakIntensity=6528.385`, `activeStrobes=4`, `exposure=0.4977`
+  - debug state reflects `sectionOverride` for all three captures

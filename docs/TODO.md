@@ -22,7 +22,7 @@
     - [x] Replace heuristic ocean reflections with Fresnel + rough-surface response
     - [x] Add shoreline and near-surface scattering cues
   - [] Phase 5: clocktower PBR lighting
-    - [] Make spotlights and strobes more physically grounded
+    - [x] Make spotlights and strobes more physically grounded
     - [] Rework the moon as a proper celestial light source
   - [] Phase 6: validation
     - [x] Lighting-specific headless regression coverage for key surface presets

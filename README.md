@@ -82,6 +82,14 @@ Cases covered:
 - `surface-second-sun`
 - `surface-night`
 
+## Headless clocktower lighting regression
+
+Runs deterministic clocktower lighting captures with explicit section/audio overrides so spotlight and strobe behavior can be validated in headless mode.
+
+```bash
+npm run headless:clocktower-lighting
+```
+
 Examples:
 
 ```bash
@@ -111,6 +119,7 @@ Useful flags:
 - `--scene=clocktower|binaryExternal|binarySurface`
 - `--preset=<preset-key>`
 - `--hour=<0-24>` and `--hour-rate=<float>`
+- `--section=<0-3>`, `--beat=<0-1>`, `--level=<0-1>`
 - `--azimuth`, `--polar`, `--distance`
 - `--target-x`, `--target-y`, `--target-z`
 - `--wait-ms=<milliseconds>`

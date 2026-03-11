@@ -1574,6 +1574,9 @@ let surfaceViewDistance = 12.4;
 let surfaceYaw = 0;
 let surfacePitch = -0.02;
 let lastTickTime = 0;
+let debugSectionOverride = null;
+let debugBeatOverride = null;
+let debugLevelOverride = null;
 
 function wrapAngle(angle) {
   return THREE.MathUtils.euclideanModulo(angle + Math.PI, Math.PI * 2) - Math.PI;
@@ -2207,6 +2210,21 @@ window.__setBinaryHourRate = (rate) => {
   binaryHourRateBase = rate;
 };
 window.__getBinaryHourRate = () => binaryHourRateBase;
+window.__setClocktowerSection = (section) => {
+  if (!Number.isFinite(section)) return;
+  debugSectionOverride = THREE.MathUtils.clamp(Math.round(section), 0, sectionNames.length - 1);
+};
+window.__clearClocktowerSection = () => {
+  debugSectionOverride = null;
+};
+window.__setAudioDrive = (next = {}) => {
+  debugBeatOverride = Number.isFinite(next.beat) ? THREE.MathUtils.clamp(next.beat, 0, 1.5) : null;
+  debugLevelOverride = Number.isFinite(next.level) ? THREE.MathUtils.clamp(next.level, 0, 1.5) : null;
+};
+window.__clearAudioDrive = () => {
+  debugBeatOverride = null;
+  debugLevelOverride = null;
+};
 window.__setScene = (sceneKey) => {
   activePresetKey = "";
   applySceneMode(sceneByKey[sceneKey] ? sceneKey : "clocktower");
@@ -2400,9 +2418,9 @@ function tick() {
   const dt = lastTickTime > 0 ? Math.min(0.25, t - lastTickTime) : 0.016;
   lastTickTime = t;
   const audio = synth.getVisualState();
-  const beat = audio.beat;
-  const level = audio.level;
-  const section = Math.floor(t / 11.5) % sectionNames.length;
+  const beat = debugBeatOverride ?? audio.beat;
+  const level = debugLevelOverride ?? audio.level;
+  const section = debugSectionOverride ?? (Math.floor(t / 11.5) % sectionNames.length);
   if (section !== currentSection) {
     currentSection = section;
     setCinematic(cinematic);
@@ -2496,6 +2514,9 @@ function tick() {
     level: Number(level.toFixed(3)),
     beat: Number(beat.toFixed(3)),
     section,
+    sectionOverride: debugSectionOverride,
+    beatOverride: debugBeatOverride,
+    levelOverride: debugLevelOverride,
     cinematicMix: Number(cinematicMix.toFixed(3)),
     blenderTower: usingBlenderTower,
     blenderCity: usingBlenderCity,

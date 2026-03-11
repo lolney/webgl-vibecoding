@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import { clocktowerLightModel } from "../shared/lightModel.js";
+import {
+  computeClocktowerLightingState,
+  clocktowerLightingDebugState,
+} from "../shared/clocktowerLighting.js";
 
 export function updateClocktowerScene(ctx, frame) {
   const {
@@ -59,14 +63,21 @@ export function updateClocktowerScene(ctx, frame) {
   } = ctx;
 
   const { t, beat, level, section, cinematicMix } = frame;
+  const lighting = computeClocktowerLightingState({
+    t,
+    beat,
+    level,
+    section,
+    strobeCount: strobeSpots.length,
+  });
 
   const autoAngle = t * 0.19;
-  renderer.toneMappingExposure = 0.62;
-  clocktowerAmbient.intensity = clocktowerLightModel.ambient.intensity;
+  renderer.toneMappingExposure = lighting.display.exposure;
+  clocktowerAmbient.intensity = lighting.ambient.intensity;
   clocktowerAmbient.color.setHex(clocktowerLightModel.ambient.color);
   scene.background.setHex(0x02030f);
   scene.fog.color.setHex(0x02030f);
-  scene.fog.density = 0.065;
+  scene.fog.density = lighting.ambient.fogDensity;
   stars.material.opacity = 0.86;
   const autoRadius = 7.2 + Math.sin(t * 0.37) * 1.4;
   const autoPos = new THREE.Vector3(
@@ -90,29 +101,13 @@ export function updateClocktowerScene(ctx, frame) {
     if (blenderHourHand) blenderHourHand.rotation.y = -t * 0.39;
   }
 
-  const pulse = 0.45 + level * 0.85 + beat * 1.2;
-  const sectionBoost = section === 1
-    ? clocktowerLightModel.sectionBoost.sectionOne
-    : section === 3
-      ? clocktowerLightModel.sectionBoost.sectionThree
-      : clocktowerLightModel.sectionBoost.default;
-  beamLight.intensity = (
-    clocktowerLightModel.beam.baseIntensity
-    + pulse * clocktowerLightModel.beam.pulseGain
-  ) * sectionBoost;
-  rim.intensity = (
-    clocktowerLightModel.rim.baseIntensity
-    + Math.sin(t * 2.3) * clocktowerLightModel.rim.swingIntensity
-    + pulse * clocktowerLightModel.rim.pulseGain
-  ) * sectionBoost;
-  key.intensity = clocktowerLightModel.key.baseIntensity
-    + Math.sin(t * 1.25) * clocktowerLightModel.key.swingIntensity
-    + level * clocktowerLightModel.key.levelGain
-    + (section === 2 ? clocktowerLightModel.key.sectionTwoBoost : 0);
-  moon.intensity = clocktowerLightModel.moon.baseIntensity
-    + Math.sin(t * 0.4) * clocktowerLightModel.moon.swingIntensity
-    + level * clocktowerLightModel.moon.levelGain;
-  beamLight.distance = clocktowerLightModel.beam.baseDistance + level * clocktowerLightModel.beam.levelDistanceGain;
+  beamLight.intensity = lighting.beam.intensity;
+  beamLight.distance = lighting.beam.distance;
+  beamLight.angle = lighting.beam.angle;
+  beamLight.penumbra = lighting.beam.penumbra;
+  rim.intensity = lighting.rim.intensity;
+  key.intensity = lighting.key.intensity;
+  moon.intensity = lighting.moon.intensity;
 
   moonVisual.position.set(
     moonBase.x + Math.sin(t * 0.08) * 1.3,
@@ -122,23 +117,28 @@ export function updateClocktowerScene(ctx, frame) {
   moon.position.copy(moonVisual.position).normalize().multiplyScalar(28);
   moonDir.copy(moon.position).normalize();
   moonVisual.lookAt(camera.position);
-  moonHalo.material.uniforms.uPulse.value = 0.2 + level * 0.35 + beat * 0.55;
+  moonHalo.material.uniforms.uPulse.value = lighting.moon.haloPulse;
 
   moonReflection.position.x = THREE.MathUtils.clamp(moonVisual.position.x * 0.5, -18.0, -12.0);
   moonReflection.position.z = shorelineZ - 20.0 + Math.max(-5, moonVisual.position.z + 36.0) * 0.12;
   moonReflection.scale.x = 0.9 + Math.abs(moonDir.x) * 0.7;
   moonReflection.material.uniforms.uTime.value = t;
   moonReflection.material.uniforms.uBeat.value = Math.min(1.0, level * 0.7 + beat * 0.8);
-  moonReflection.material.uniforms.uStrength.value = 1.55 + moon.intensity * clocktowerLightModel.moon.reflectionGainPrimary;
+  moonReflection.material.uniforms.uStrength.value = lighting.moon.reflectionPrimary;
 
   moonReflectionWide.position.x = moonReflection.position.x + 1.1;
   moonReflectionWide.position.z = moonReflection.position.z - 5.2;
   moonReflectionWide.material.uniforms.uTime.value = t * 0.85 + 4.0;
   moonReflectionWide.material.uniforms.uBeat.value = Math.min(1.0, level * 0.55 + beat * 0.6);
-  moonReflectionWide.material.uniforms.uStrength.value = 1.0 + moon.intensity * clocktowerLightModel.moon.reflectionGainWide;
+  moonReflectionWide.material.uniforms.uStrength.value = lighting.moon.reflectionWide;
 
-  beaconBeam.rotation.z = Math.sin(t * 1.5) * 0.16 + beat * 0.06;
-  beaconBeam.material.opacity = 0.11 + (Math.sin(t * 3.6) * 0.5 + 0.5) * 0.13 + level * 0.18;
+  beaconBeam.rotation.z = lighting.beam.sweep;
+  beaconBeam.material.opacity = lighting.beam.coneOpacity;
+  beaconBeam.scale.set(
+    THREE.MathUtils.clamp(lighting.beam.radius / 1.1, 0.9, 3.4),
+    THREE.MathUtils.clamp(lighting.beam.distance / 12.5, 0.9, 5.4),
+    THREE.MathUtils.clamp(lighting.beam.radius / 1.1, 0.9, 3.4),
+  );
   displaceWaterGeometry(oceanGeometry, oceanBasePos, t * 0.9, 1.15 + level * 0.3 + beat * 0.45);
   displaceWaterGeometry(farOceanGeometry, farOceanBasePos, t * 0.72 + 5.0, 0.95 + level * 0.2);
 
@@ -159,29 +159,23 @@ export function updateClocktowerScene(ctx, frame) {
     const spot = strobeSpots[i];
     const target = strobeTargets[i];
     const cone = strobeCones[i];
-    const phase = t * (8.5 + i * 0.75) + i * 1.13;
-    const hardStrobe = Math.pow(Math.max(0, Math.sin(phase)), section === 3 ? 7.5 : 5.8);
-    const beatAmp = 1.0 + beat * 2.2;
-    const base = clocktowerLightModel.strobe.baseIntensity;
-    const peak = (
-      section === 3
-        ? clocktowerLightModel.strobe.sectionThreePeak
-        : clocktowerLightModel.strobe.sectionDefaultPeak
-    ) * beatAmp;
-    spot.intensity = base + hardStrobe * peak;
-    spot.angle = 0.16 + (Math.sin(t * 0.7 + i) * 0.5 + 0.5) * 0.14;
+    const strobe = lighting.strobes[i];
+    spot.intensity = strobe.intensity;
+    spot.angle = strobe.angle;
+    spot.distance = strobe.distance;
 
-    target.position.set(
-      Math.sin(t * 0.48 + i * 1.4) * 1.8,
-      1.3 + Math.sin(t * 0.7 + i * 0.8) * 0.55,
-      Math.cos(t * 0.52 + i * 1.1) * 1.5,
-    );
+    target.position.set(strobe.target.x, strobe.target.y, strobe.target.z);
 
     cone.position.copy(spot.position);
     tmpDir.copy(target.position).sub(spot.position).normalize();
     cone.quaternion.setFromUnitVectors(upAxis, tmpDir);
-    cone.material.opacity = 0.008 + hardStrobe * (0.045 + level * 0.06);
-    cone.scale.set(1, 1 + level * 0.12, 1);
+    cone.material.opacity = strobe.coneOpacity;
+    const radiusScale = THREE.MathUtils.clamp(
+      (strobe.distance * Math.tan(strobe.angle)) / (58 * Math.tan(0.2)),
+      0.8,
+      2.8,
+    );
+    cone.scale.set(radiusScale, (strobe.distance / 58) * strobe.coneStretch, radiusScale);
   }
 
   ringGroup.children.forEach((ring, i) => {
@@ -211,10 +205,9 @@ export function updateClocktowerScene(ctx, frame) {
   shoreline.material.uniforms.uTime.value = t;
   shoreline.material.uniforms.uBeat.value = Math.min(1.0, level * 0.8 + beat * 1.2);
 
-  bloomPass.strength =
-    (section === 3 ? 0.78 : 0.48) + level * (section === 1 ? 0.34 : 0.24) + beat * 0.22;
-  bloomPass.radius = 0.28 + level * (section === 2 ? 0.18 : 0.12);
-  bloomPass.threshold = (section === 3 ? 0.84 : 0.88) - level * 0.03;
+  bloomPass.strength = lighting.display.bloomStrength;
+  bloomPass.radius = lighting.display.bloomRadius;
+  bloomPass.threshold = lighting.display.bloomThreshold;
 
   crtPass.uniforms.uTime.value = t;
   crtPass.uniforms.uBeat.value = Math.min(1.0, beat * 1.2 + level * 0.6);
@@ -233,5 +226,6 @@ export function updateClocktowerScene(ctx, frame) {
     scene: "clocktower",
     section,
     oceanTime: Number(ocean.material.uniforms.time.value.toFixed(2)),
+    lighting: clocktowerLightingDebugState(lighting),
   };
 }
