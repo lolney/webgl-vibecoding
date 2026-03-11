@@ -45,6 +45,9 @@ assert(sunrise.lighting.primaryDirectIlluminance < noon.lighting.primaryDirectIl
 assert(noon.lighting.primaryDirectLux > sunrise.lighting.primaryDirectLux, "Noon direct lux should exceed sunrise");
 assert(noon.lighting.primaryDiscLuminance > sunset.lighting.primaryDiscLuminance, "Noon disc luminance should exceed sunset");
 assert(sunrise.lighting.hazeFactor > noon.lighting.hazeFactor, "Sunrise haze should exceed noon haze");
+assert(sunset.lighting.skyHorizonLuminance > night.lighting.skyHorizonLuminance, "Sunset horizon should be brighter than night horizon");
+assert(sunset.lighting.skyHorizonLuminance > sunset.lighting.skyZenithLuminance, "Sunset horizon should dominate sunset zenith");
+assert(noon.lighting.skyZenithLuminance > night.lighting.skyZenithLuminance, "Noon zenith should exceed night zenith");
 assert(sunset.primaryAltitudeDeg > -1.0 && sunset.primaryAltitudeDeg < 1.0, "Sunset preset should place primary star at horizon");
 assert(secondSun.secondaryAltitudeDeg > 8, "Second-sun preset should place secondary star above horizon");
 assert(secondSun.primaryAltitudeDeg < 0, "Second-sun preset should keep primary star below horizon");

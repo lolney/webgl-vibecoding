@@ -10,7 +10,7 @@
   - [] Phase 2: atmospheric scattering
     - [x] Surface scattering approximation
     - [x] First-order sun-disc extinction
-    - [] Move from palette-driven sky color to atmosphere-derived radiance
+    - [x] Move from palette-driven sky color to atmosphere-derived radiance
     - [] Upgrade extinction from RGB heuristics to coarse wavelength-bucket modeling
   - [] Cross-cutting cleanup
     - [] Remove or isolate non-celestial helper lights in the planet scene

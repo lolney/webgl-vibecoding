@@ -5,12 +5,9 @@ const PRIMARY_BASE = new THREE.Color(0xfff1cf);
 const SECONDARY_BASE = new THREE.Color(0xc9dcff);
 const NIGHT_ZENITH = new THREE.Color(0x020712);
 const NIGHT_HORIZON = new THREE.Color(0x081428);
-const DAY_ZENITH = new THREE.Color(0x2d69b8);
-const DAY_HORIZON = new THREE.Color(0x95b7e5);
-const TWILIGHT_WARM = new THREE.Color(0xff8c46);
-const TWILIGHT_COOL = new THREE.Color(0x4b7bd0);
-const RAYLEIGH_BASE = new THREE.Color(0x77b6ff);
-const MIE_COOL = new THREE.Color(0xa9c8ff);
+const RAYLEIGH_COEFF = new THREE.Color(0.33, 0.56, 1.0);
+const MIE_COEFF = new THREE.Color(1.0, 0.91, 0.76);
+const AIR_GLOW_COEFF = new THREE.Color(0.14, 0.2, 0.32);
 
 const PRIMARY_EXTINCTION = new THREE.Vector3(0.045, 0.082, 0.17);
 const SECONDARY_EXTINCTION = new THREE.Vector3(0.052, 0.094, 0.19);
@@ -53,6 +50,23 @@ function apparentSolarColor(baseColor, transmittance) {
   const color = multiplyColor(baseColor, transmittance);
   const peak = Math.max(color.r, color.g, color.b, 1e-3);
   return color.multiplyScalar(1 / peak);
+}
+
+function scaleColor(color, scalar) {
+  return color.clone().multiplyScalar(scalar);
+}
+
+function chromaOrFallback(color, fallback) {
+  const peak = Math.max(color.r, color.g, color.b);
+  if (peak <= 1e-5) return fallback.clone();
+  return color.clone().multiplyScalar(1 / peak);
+}
+
+function clampColor(color, maxValue = 1.5) {
+  color.r = THREE.MathUtils.clamp(color.r, 0, maxValue);
+  color.g = THREE.MathUtils.clamp(color.g, 0, maxValue);
+  color.b = THREE.MathUtils.clamp(color.b, 0, maxValue);
+  return color;
 }
 
 function solarState({
@@ -142,16 +156,31 @@ export function computeLightingState(orbit) {
       + secondary.horizonFactor * secondary.visibleFactor * 0.34,
   );
 
-  const zenithColor = NIGHT_ZENITH.clone()
-    .lerp(TWILIGHT_COOL, twilight * 0.65)
-    .lerp(DAY_ZENITH, daylight);
-  const horizonColor = NIGHT_HORIZON.clone()
-    .lerp(TWILIGHT_WARM, clamp01(twilight + horizonWarmth * 0.4))
-    .lerp(DAY_HORIZON, daylight * 0.82);
-  const rayleighColor = RAYLEIGH_BASE.clone()
-    .lerp(new THREE.Color(0xa6cbff), clamp01(daylight * 0.7 + twilight * 0.3));
-  const mieColorA = apparentColorMix(primary.apparentColor, TWILIGHT_WARM, 0.22 + primary.horizonFactor * 0.5);
-  const mieColorB = apparentColorMix(secondary.apparentColor, MIE_COOL, 0.45);
+  const primaryRayleighRadiance = multiplyColor(primary.apparentColor, RAYLEIGH_COEFF)
+    .multiplyScalar(primary.scatterFactor * (0.48 + primary.transmittanceLuma * 0.52));
+  const secondaryRayleighRadiance = multiplyColor(secondary.apparentColor, RAYLEIGH_COEFF)
+    .multiplyScalar(secondary.scatterFactor * (0.42 + secondary.transmittanceLuma * 0.58));
+  const rayleighRadiance = primaryRayleighRadiance.clone().add(secondaryRayleighRadiance);
+
+  const primaryMieRadiance = multiplyColor(primary.apparentColor, MIE_COEFF)
+    .multiplyScalar(primary.mieFactor * (0.55 + primary.horizonFactor * 0.45));
+  const secondaryMieRadiance = multiplyColor(secondary.apparentColor, MIE_COEFF)
+    .multiplyScalar(secondary.mieFactor * (0.48 + secondary.horizonFactor * 0.36));
+  const mieRadiance = primaryMieRadiance.clone().add(secondaryMieRadiance);
+
+  const zenithRadiance = scaleColor(rayleighRadiance, 0.82 + daylight * 0.28)
+    .add(scaleColor(mieRadiance, 0.08 + haze * 0.04))
+    .add(scaleColor(AIR_GLOW_COEFF, daylight * 0.06));
+  const horizonRadiance = scaleColor(rayleighRadiance, 0.34 + twilight * 0.18)
+    .add(scaleColor(mieRadiance, 0.92 + haze * 0.52))
+    .add(scaleColor(primary.apparentColor, primary.horizonFactor * 0.14))
+    .add(scaleColor(secondary.apparentColor, secondary.horizonFactor * 0.08));
+
+  const zenithColor = clampColor(NIGHT_ZENITH.clone().add(zenithRadiance), 1.2);
+  const horizonColor = clampColor(NIGHT_HORIZON.clone().add(horizonRadiance), 1.25);
+  const rayleighColor = chromaOrFallback(rayleighRadiance, RAYLEIGH_COEFF);
+  const mieColorA = chromaOrFallback(primaryMieRadiance, primary.apparentColor);
+  const mieColorB = chromaOrFallback(secondaryMieRadiance, secondary.apparentColor);
 
   const ambientColor = NIGHT_HORIZON.clone()
     .lerp(horizonColor, twilight * 0.55 + daylight * 0.3)
@@ -266,6 +295,8 @@ export function lightingDebugState(lighting) {
     secondaryDirectLux: Number(lighting.illumination.secondaryDirectLux.toFixed(1)),
     ambientLux: Number(lighting.illumination.ambientLux.toFixed(4)),
     fillLux: Number(lighting.illumination.fillLux.toFixed(4)),
+    skyZenithLuminance: Number(luma(lighting.sky.zenithColor).toFixed(4)),
+    skyHorizonLuminance: Number(luma(lighting.sky.horizonColor).toFixed(4)),
     primaryDiscLuminance: Number(lighting.sourceUnits.primaryDiscLuminance.toFixed(3)),
     secondaryDiscLuminance: Number(lighting.sourceUnits.secondaryDiscLuminance.toFixed(3)),
     primaryHaloLuminance: Number(lighting.sourceUnits.primaryHaloLuminance.toFixed(3)),
