@@ -10,7 +10,7 @@ export function updateClocktowerScene(ctx, frame) {
     composer,
     stars,
     sky,
-    ambient,
+    clocktowerAmbient,
     key,
     rim,
     moon,
@@ -62,8 +62,8 @@ export function updateClocktowerScene(ctx, frame) {
 
   const autoAngle = t * 0.19;
   renderer.toneMappingExposure = 0.62;
-  ambient.intensity = clocktowerLightModel.ambient.intensity;
-  ambient.color.setHex(clocktowerLightModel.ambient.color);
+  clocktowerAmbient.intensity = clocktowerLightModel.ambient.intensity;
+  clocktowerAmbient.color.setHex(clocktowerLightModel.ambient.color);
   scene.background.setHex(0x02030f);
   scene.fog.color.setHex(0x02030f);
   scene.fog.density = 0.065;

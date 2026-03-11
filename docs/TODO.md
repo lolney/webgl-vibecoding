@@ -13,7 +13,7 @@
     - [x] Move from palette-driven sky color to atmosphere-derived radiance
     - [x] Upgrade extinction from RGB heuristics to coarse wavelength-bucket modeling
   - [] Cross-cutting cleanup
-    - [] Remove or isolate non-celestial helper lights in the planet scene
+    - [x] Remove or isolate non-celestial helper lights in the planet scene
     - [] Separate source radiometry, atmospheric transport, surface response, and display response
   - [] Phase 3: volumetrics
     - [] Add volumetric aerial perspective

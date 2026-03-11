@@ -12,7 +12,7 @@ export function updateBinaryScene(ctx, frame) {
     stars,
     nebulaShell,
     sky,
-    ambient,
+    binaryAmbient,
     binaryFill,
     binaryStarALight,
     binaryStarBLight,
@@ -90,8 +90,8 @@ export function updateBinaryScene(ctx, frame) {
   cloudLayer.rotation.y = -t * 0.17;
 
   if (isSurfaceScene) {
-    ambient.intensity = illumination.ambientLux;
-    ambient.color.copy(skyLighting.ambientColor);
+    binaryAmbient.intensity = illumination.ambientLux;
+    binaryAmbient.color.copy(skyLighting.ambientColor);
     scene.fog.color.copy(skyLighting.fogColor);
     scene.background.copy(skyLighting.backgroundColor);
     scene.fog.density = skyLighting.fogDensity;
@@ -99,8 +99,8 @@ export function updateBinaryScene(ctx, frame) {
     stars.material.opacity = THREE.MathUtils.lerp(0.96, 0.12, skyLighting.daylight);
     stars.material.size = THREE.MathUtils.lerp(0.24, 0.06, skyLighting.daylight);
   } else if (isExternalScene) {
-    ambient.intensity = 0.0;
-    ambient.color.setRGB(0.0, 0.0, 0.0);
+    binaryAmbient.intensity = 0.0;
+    binaryAmbient.color.setRGB(0.0, 0.0, 0.0);
     scene.background.setHex(0x02030f);
     scene.fog.color.setHex(0x02030f);
     scene.fog.density = 0.019;

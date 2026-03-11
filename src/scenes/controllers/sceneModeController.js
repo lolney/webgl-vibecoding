@@ -11,6 +11,8 @@ export function applySceneModeInternal(params) {
     surfaceForeground,
     controls,
     camera,
+    clocktowerAmbient,
+    binaryAmbient,
     binaryStarALight,
     binaryStarBLight,
     binaryFill,
@@ -48,8 +50,10 @@ export function applySceneModeInternal(params) {
 
   binaryStarALight.visible = !isClocktower;
   binaryStarBLight.visible = !isClocktower;
+  binaryAmbient.visible = !isClocktower;
   binaryFill.visible = !isClocktower;
 
+  clocktowerAmbient.visible = isClocktower;
   key.visible = isClocktower;
   rim.visible = isClocktower;
   beamLight.visible = isClocktower;

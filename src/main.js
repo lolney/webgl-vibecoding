@@ -161,8 +161,8 @@ const crtPass = new ShaderPass({
 composer.addPass(crtPass);
 crtPass.enabled = !debugView;
 
-const ambient = new THREE.AmbientLight(0x3346bb, 0.56);
-scene.add(ambient);
+const clocktowerAmbient = new THREE.AmbientLight(0x3346bb, 0.56);
+scene.add(clocktowerAmbient);
 
 const key = new THREE.DirectionalLight(0x8ce9ff, 1.2);
 key.position.set(4.2, 6.2, 5.8);
@@ -180,6 +180,10 @@ scene.add(key);
 const moon = new THREE.DirectionalLight(0xb2d7ff, 0.85);
 moon.position.set(-8, 4.5, -18);
 scene.add(moon);
+
+const binaryAmbient = new THREE.AmbientLight(0x8fb7ff, 0.0);
+binaryAmbient.visible = false;
+scene.add(binaryAmbient);
 
 const binaryFill = new THREE.HemisphereLight(0x8fb7ff, 0x050916, 0.55);
 binaryFill.visible = false;
@@ -1644,6 +1648,8 @@ function applySceneMode(nextSceneKey, options = {}) {
     surfaceForeground,
     controls,
     camera,
+    clocktowerAmbient,
+    binaryAmbient,
     binaryStarALight,
     binaryStarBLight,
     binaryFill,
@@ -2183,7 +2189,7 @@ const binaryControllerCtx = {
   stars,
   nebulaShell,
   sky,
-  ambient,
+  binaryAmbient,
   binaryFill,
   binaryStarALight,
   binaryStarBLight,
@@ -2221,7 +2227,7 @@ const clocktowerControllerCtx = {
   composer,
   stars,
   sky,
-  ambient,
+  clocktowerAmbient,
   key,
   rim,
   moon,
