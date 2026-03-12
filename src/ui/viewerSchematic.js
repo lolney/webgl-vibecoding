@@ -86,6 +86,27 @@ function rotateVec(v, q) {
   return add(v, add(scale(uv, 2 * q[3]), scale(uuv, 2)));
 }
 
+function buildPlanetAxes(spinAxis) {
+  const helper = Math.abs(dot(spinAxis, [0, 1, 0])) < 0.94 ? [0, 1, 0] : [1, 0, 0];
+  const equatorX = normalize3(cross(helper, spinAxis));
+  const equatorZ = normalize3(cross(spinAxis, equatorX));
+  return { equatorX, equatorZ, north: spinAxis };
+}
+
+function planetPoint(axes, latitudeDeg, longitudeRad) {
+  const lat = (latitudeDeg * Math.PI) / 180;
+  const cosLat = Math.cos(lat);
+  return normalize3(
+    add(
+      add(
+        scale(axes.equatorX, Math.cos(longitudeRad) * cosLat),
+        scale(axes.equatorZ, Math.sin(longitudeRad) * cosLat),
+      ),
+      scale(axes.north, Math.sin(lat)),
+    ),
+  );
+}
+
 function drawArrow(ctx, x0, y0, x1, y1, color, width = 2) {
   const dx = x1 - x0;
   const dy = y1 - y0;
@@ -151,6 +172,7 @@ export function createViewerSchematic({ root = document, onLatitudeAdjust = null
     const secondaryDir = normalize3(data.secondaryDir || [0, 0, 1]);
     const spinAxis = normalize3(data.spinAxis || [0, 1, 0]);
     const latitudeDeg = Number(data.latitudeDeg) || 0;
+    const planetAxes = buildPlanetAxes(spinAxis);
 
     const forward = normalize3([0.72, 0.54, 0.92]);
     const right = normalize3(cross([0, 1, 0], forward));
@@ -175,6 +197,7 @@ export function createViewerSchematic({ root = document, onLatitudeAdjust = null
       primaryDir,
       secondaryDir,
       anchorVec,
+      planetAxes,
     };
   }
 
@@ -187,11 +210,9 @@ export function createViewerSchematic({ root = document, onLatitudeAdjust = null
     ctx.lineWidth = width;
     ctx.beginPath();
     let penDown = false;
-    const latR = Math.cos((latDeg * Math.PI) / 180);
-    const y0 = Math.sin((latDeg * Math.PI) / 180);
     for (let i = 0; i <= 96; i += 1) {
       const lon = (i / 96) * Math.PI * 2;
-      const p = [Math.cos(lon) * latR, y0, Math.sin(lon) * latR];
+      const p = planetPoint(state.planetAxes, latDeg, lon);
       const pr = projectRotated(p, state);
       const x = cx + pr.x * r;
       const y = cy - pr.y * r;
@@ -211,11 +232,9 @@ export function createViewerSchematic({ root = document, onLatitudeAdjust = null
 
   function drawLatitudeLabel(state, latDeg, label, cx, cy, r) {
     let best = null;
-    const latR = Math.cos((latDeg * Math.PI) / 180);
-    const y0 = Math.sin((latDeg * Math.PI) / 180);
     for (let i = 0; i <= 128; i += 1) {
       const lon = (i / 128) * Math.PI * 2;
-      const p = [Math.cos(lon) * latR, y0, Math.sin(lon) * latR];
+      const p = planetPoint(state.planetAxes, latDeg, lon);
       const pr = projectRotated(p, state);
       if (pr.z <= 0.02) continue;
       if (!best || pr.x < best.x) {
@@ -223,7 +242,7 @@ export function createViewerSchematic({ root = document, onLatitudeAdjust = null
       }
     }
     if (!best) {
-      const pole = latDeg >= 0 ? [0, 1, 0] : [0, -1, 0];
+      const pole = latDeg >= 0 ? state.planetAxes.north : scale(state.planetAxes.north, -1);
       best = projectRotated(pole, state);
     }
     ctx.fillStyle = "rgba(220, 236, 255, 0.82)";
@@ -266,6 +285,15 @@ export function createViewerSchematic({ root = document, onLatitudeAdjust = null
       drawLatitudeRing(state, lat, cx, cy, r, "rgba(164, 210, 255, 0.35)");
     }
     drawLatitudeRing(state, 0, cx, cy, r, "rgba(255, 238, 160, 0.5)", 1.15);
+    drawLatitudeRing(
+      state,
+      clamp(state.latitudeDeg, -90, 90),
+      cx,
+      cy,
+      r,
+      "rgba(255, 245, 124, 0.82)",
+      1.7,
+    );
 
     const labelMap = [
       { lat: 90, text: "90N" },

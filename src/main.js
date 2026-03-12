@@ -1572,10 +1572,13 @@ let binaryDayHours = resolvedInitialBinaryState.binaryDayHours;
 let binarySimulationDays = resolvedInitialBinaryState.binarySimulationDays;
 let binaryHourRateBase = resolvedInitialBinaryState.binaryHourRateBase;
 let binaryTimeMultiplier = resolvedInitialBinaryState.binaryTimeMultiplier;
+let observerLatitudeTravelDeg = resolvedInitialBinaryState.observerLatitudeInputDeg;
+let observerLongitudeBaseDeg = resolvedInitialBinaryState.observerLongitudeInputDeg;
 let observerLatitudeDeg = resolvedInitialBinaryState.observerLatitudeDeg;
 let observerLongitudeDeg = resolvedInitialBinaryState.observerLongitudeDeg;
 let diagnosticsVisible = resolvedInitialBinaryState.diagnosticsVisible || debugView;
 let pendingInitialOrbitView = resolvedInitialBinaryState.orbitView;
+let pendingInitialSurfacePitch = resolvedInitialBinaryState.surfacePitch;
 const surfaceObserverAnchor = new THREE.Vector3();
 const surfaceLookDir = new THREE.Vector3(0, 0.04, 1).normalize();
 const surfaceViewDistanceMin = 11.8;
@@ -1598,8 +1601,10 @@ function lerpAngle(from, to, t) {
   return from + wrapAngle(to - from) * t;
 }
 
-function applyObserverCoordinates(latitudeDeg, longitudeDeg) {
-  const nextCoords = normalizeObserverCoordinates(latitudeDeg, longitudeDeg);
+function applyObserverTravelCoordinates(latitudeTravelDeg, longitudeBaseDeg) {
+  observerLatitudeTravelDeg = Number.isFinite(latitudeTravelDeg) ? latitudeTravelDeg : 0;
+  observerLongitudeBaseDeg = Number.isFinite(longitudeBaseDeg) ? longitudeBaseDeg : 0;
+  const nextCoords = normalizeObserverCoordinates(observerLatitudeTravelDeg, observerLongitudeBaseDeg);
   observerLatitudeDeg = nextCoords.latitudeDeg;
   observerLongitudeDeg = nextCoords.longitudeDeg;
   return nextCoords;
@@ -1609,14 +1614,14 @@ function setObserverCoordinates(latitudeDeg, longitudeDeg, options = {}) {
   const { syncUrl = false, pushHistory = false } = options;
   activePresetKey = "";
   hud.setPreset("");
-  applyObserverCoordinates(latitudeDeg, longitudeDeg);
+  applyObserverTravelCoordinates(latitudeDeg, longitudeDeg);
   if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
   if (syncUrl) syncSceneToUrl(activeSceneKey, { pushHistory });
 }
 
 function adjustObserverLatitude(deltaDeg, options = {}) {
   if (!Number.isFinite(deltaDeg) || deltaDeg === 0) return;
-  setObserverCoordinates(observerLatitudeDeg + deltaDeg, observerLongitudeDeg, options);
+  setObserverCoordinates(observerLatitudeTravelDeg + deltaDeg, observerLongitudeBaseDeg, options);
 }
 
 function getSurfaceObserverState() {
@@ -1716,44 +1721,45 @@ function syncSceneToUrl(sceneKey, options = {}) {
 }
 
 function applyBinaryPreset(presetKey, options = {}) {
-  const { syncUrl = true, pushHistory = false } = options;
+  const { syncUrl = true, pushHistory = false, explicitState = null } = options;
   const preset = getPresetsForScene(activeSceneKey).find((entry) => entry.key === presetKey);
   if (!preset) return;
+  const presetState = explicitState ? { ...preset.state, ...explicitState } : preset.state;
   activePresetKey = preset.key;
-  if (Number.isFinite(preset.state.binaryDayHours)) {
-    setBinaryClockHours(preset.state.binaryDayHours, { preserveContinuity: false });
+  if (Number.isFinite(presetState.binaryDayHours)) {
+    setBinaryClockHours(presetState.binaryDayHours, { preserveContinuity: false });
   }
-  if (Number.isFinite(preset.state.simulationDays)) {
-    binarySimulationDays = preset.state.simulationDays;
+  if (Number.isFinite(presetState.simulationDays)) {
+    binarySimulationDays = presetState.simulationDays;
   }
-  if (Number.isFinite(preset.state.latitudeDeg)) {
-    applyObserverCoordinates(
-      preset.state.latitudeDeg,
-      Number.isFinite(preset.state.longitudeDeg) ? preset.state.longitudeDeg : observerLongitudeDeg,
+  if (Number.isFinite(presetState.latitudeDeg)) {
+    applyObserverTravelCoordinates(
+      presetState.latitudeDeg,
+      Number.isFinite(presetState.longitudeDeg) ? presetState.longitudeDeg : observerLongitudeBaseDeg,
     );
-  } else if (Number.isFinite(preset.state.longitudeDeg)) {
-    applyObserverCoordinates(observerLatitudeDeg, preset.state.longitudeDeg);
+  } else if (Number.isFinite(presetState.longitudeDeg)) {
+    applyObserverTravelCoordinates(observerLatitudeTravelDeg, presetState.longitudeDeg);
   }
-  if (Number.isFinite(preset.state.multiplier)) {
-    setBinaryTimeMultiplier(preset.state.multiplier);
+  if (Number.isFinite(presetState.multiplier)) {
+    setBinaryTimeMultiplier(presetState.multiplier);
   }
-  if (typeof preset.state.cinematic === "boolean") {
-    setCinematic(preset.state.cinematic);
+  if (typeof presetState.cinematic === "boolean") {
+    setCinematic(presetState.cinematic);
   }
   if (activeSceneKey === "binarySurface") {
     surfaceObserverAnchor.set(0, 1.42, 0);
     const orbit = getSurfaceObserverState();
     surfaceYaw = Math.atan2(orbit.primaryLocalDir.x, orbit.primaryLocalDir.z);
     surfacePitch = THREE.MathUtils.clamp(
-      Number.isFinite(preset.state.surfacePitch)
-        ? preset.state.surfacePitch
+      Number.isFinite(presetState.surfacePitch)
+        ? presetState.surfacePitch
         : (Math.asin(THREE.MathUtils.clamp(orbit.primaryLocalDir.y, -1, 1)) * 0.5 - 0.03),
       surfacePitchMin,
       surfacePitchMax,
     );
     updateSurfaceCamera(0);
-  } else if (preset.state.orbitView && typeof window.__setOrbitView === "function") {
-    window.__setOrbitView(preset.state.orbitView);
+  } else if (presetState.orbitView && typeof window.__setOrbitView === "function") {
+    window.__setOrbitView(presetState.orbitView);
   }
   hud.setPreset(activePresetKey);
   if (syncUrl) syncSceneToUrl(activeSceneKey, { pushHistory });
@@ -2086,7 +2092,19 @@ function setCinematic(on) {
 setCinematic(resolvedInitialBinaryState.cinematic);
 applySceneMode(sceneByKey[initialSceneQuery] ? initialSceneQuery : resolvedInitialBinaryState.scene);
 if (activePresetKey) {
-  applyBinaryPreset(activePresetKey, { syncUrl: false });
+  applyBinaryPreset(activePresetKey, {
+    syncUrl: false,
+    explicitState: {
+      binaryDayHours,
+      simulationDays: binarySimulationDays,
+      latitudeDeg: observerLatitudeTravelDeg,
+      longitudeDeg: observerLongitudeBaseDeg,
+      multiplier: binaryTimeMultiplier,
+      cinematic,
+      surfacePitch: pendingInitialSurfacePitch,
+      orbitView: pendingInitialOrbitView,
+    },
+  });
 }
 if (debugView) {
   modeBadge.textContent = "Debug Camera // Geometry";
@@ -2198,12 +2216,26 @@ window.addEventListener("popstate", () => {
   binaryDayHours = nextState.binaryDayHours;
   binarySimulationDays = nextState.binarySimulationDays;
   binaryHourRateBase = nextState.binaryHourRateBase;
-  applyObserverCoordinates(nextState.observerLatitudeDeg, nextState.observerLongitudeDeg);
+  applyObserverTravelCoordinates(nextState.observerLatitudeInputDeg, nextState.observerLongitudeInputDeg);
   binaryTimeMultiplier = nextState.binaryTimeMultiplier;
   diagnosticsVisible = nextState.diagnosticsVisible || debugView;
   applySceneMode(sceneByKey[nextState.scene] ? nextState.scene : "clocktower", { syncUrl: false });
   setCinematic(nextState.cinematic);
-  if (activePresetKey) applyBinaryPreset(activePresetKey, { syncUrl: false });
+  if (activePresetKey) {
+    applyBinaryPreset(activePresetKey, {
+      syncUrl: false,
+      explicitState: {
+        binaryDayHours,
+        simulationDays: binarySimulationDays,
+        latitudeDeg: observerLatitudeTravelDeg,
+        longitudeDeg: observerLongitudeBaseDeg,
+        multiplier: binaryTimeMultiplier,
+        cinematic: nextState.cinematic,
+        surfacePitch: nextState.surfacePitch,
+        orbitView: nextState.orbitView,
+      },
+    });
+  }
   diagnosticsPanel.setVisible(diagnosticsVisible);
 });
 
@@ -2557,6 +2589,8 @@ function tick() {
     binaryHourRateBase: Number(binaryHourRateBase.toFixed(4)),
     timeMultiplier: binaryTimeMultiplier,
     binarySimulationDays: Number(binarySimulationDays.toFixed(4)),
+    observerLatitudeTravelDeg: Number(observerLatitudeTravelDeg.toFixed(2)),
+    observerLongitudeBaseDeg: Number(observerLongitudeBaseDeg.toFixed(2)),
     observerLatitudeDeg: Number(observerLatitudeDeg.toFixed(2)),
     observerLongitudeDeg: Number(observerLongitudeDeg.toFixed(2)),
     cameraPos: [Number(camera.position.x.toFixed(3)), Number(camera.position.y.toFixed(3)), Number(camera.position.z.toFixed(3))],

@@ -153,10 +153,12 @@ export function resolveInitialBinaryState(urlState) {
   const preset = findBinaryPreset(urlState.preset);
   const presetState = preset?.state || {};
   const rawHour = urlState.binaryHour ?? presetState.binaryDayHours ?? binaryDefaultStartHour;
+  const rawLatitudeInput = urlState.binaryLat ?? presetState.latitudeDeg ?? 0;
+  const rawLongitudeInput = urlState.binaryLon ?? presetState.longitudeDeg ?? 0;
   const binaryDayHours = THREE.MathUtils.euclideanModulo(rawHour, 24);
   const observerCoords = normalizeObserverCoordinates(
-    urlState.binaryLat ?? presetState.latitudeDeg ?? 0,
-    urlState.binaryLon ?? presetState.longitudeDeg ?? 0,
+    rawLatitudeInput,
+    rawLongitudeInput,
   );
   return {
     presetKey: preset?.key || "",
@@ -166,12 +168,15 @@ export function resolveInitialBinaryState(urlState) {
       : (presetState.simulationDays ?? binaryDefaultSimulationDays),
     binaryHourRateBase: urlState.binaryHourRate ?? 0.12,
     binaryTimeMultiplier: coerceTimeMultiplier(urlState.timeMultiplier ?? presetState.multiplier ?? 1),
+    observerLatitudeInputDeg: rawLatitudeInput,
+    observerLongitudeInputDeg: rawLongitudeInput,
     observerLatitudeDeg: observerCoords.latitudeDeg,
     observerLongitudeDeg: observerCoords.longitudeDeg,
     cinematic: urlState.cinematic || Boolean(presetState.cinematic),
     diagnosticsVisible: urlState.diagnostics,
     scene: urlState.scene || preset?.scene || "clocktower",
     orbitView: presetState.orbitView || null,
+    surfacePitch: Number.isFinite(presetState.surfacePitch) ? presetState.surfacePitch : null,
   };
 }
 

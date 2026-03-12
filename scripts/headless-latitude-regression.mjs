@@ -124,19 +124,32 @@ try {
   assert(/LATITUDE -6[0-9]\./.test(southDrag.label), `Unexpected south latitude label: ${southDrag.label}`);
   await page.screenshot({ path: outputPath("latitude-regression-south-page.png"), fullPage: true });
 
-  await page.evaluate(() => {
-    window.__setBinaryTime(6);
-    window.__setBinaryHourRate(0);
-    window.__setObserverLatitude(80);
-    window.__setObserverLongitude(-25);
+  const directRoute = new URLSearchParams({
+    scene: "binarySurface",
+    preset: "surface-sunrise",
+    binaryHourRate: "0",
+    binaryLat: "60",
   });
-  await page.waitForTimeout(500);
-  await page.evaluate(() => {
-    window.__setObserverLatitude(120);
+  await page.goto(`http://127.0.0.1:${port}/?${directRoute.toString()}`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(900);
+  const directLat = await getSnapshot(page);
+  approx(directLat.state.observerLatitudeDeg, 60, 0.1, "direct-route latitude");
+  approx(directLat.state.observerLatitudeTravelDeg, 60, 0.1, "direct-route travel latitude");
+  approx(directLat.state.observerLongitudeDeg, 0, 0.1, "direct-route longitude");
+  assert(directLat.label.includes("60.0"), `Direct-route latitude label should show 60 deg: ${directLat.label}`);
+
+  const poleRoute = new URLSearchParams({
+    scene: "binarySurface",
+    preset: "surface-sunrise",
+    binaryHourRate: "0",
+    binaryLat: "80",
   });
-  await page.waitForTimeout(500);
+  await page.goto(`http://127.0.0.1:${port}/?${poleRoute.toString()}`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(900);
+  await drag(page, "#viewerSchematicCanvas", 0, 80);
+  await page.waitForTimeout(700);
   const poleWrap = await getSnapshot(page);
-  const expectedPoleWrap = normalizeObserverCoordinates(120, -25);
+  const expectedPoleWrap = normalizeObserverCoordinates(124.8, 0);
   assert(
     poleWrap.state.observerLatitudeDeg >= 0 && poleWrap.state.observerLatitudeDeg < 90,
     `Pole-wrap latitude should stay normalized, got ${poleWrap.state.observerLatitudeDeg}`,
@@ -144,6 +157,10 @@ try {
   assert(
     poleWrap.state.observerLatitudeDeg < 80,
     `Pole-wrap latitude should continue past the pole onto the far side, got ${poleWrap.state.observerLatitudeDeg}`,
+  );
+  assert(
+    poleWrap.state.observerLatitudeTravelDeg > 120,
+    `Pole-wrap travel latitude should advance beyond 90 deg, got ${poleWrap.state.observerLatitudeTravelDeg}`,
   );
   approx(poleWrap.state.observerLongitudeDeg, expectedPoleWrap.longitudeDeg, 0.8, "pole-wrap longitude");
   assert(
