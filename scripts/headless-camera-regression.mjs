@@ -91,6 +91,31 @@ try {
   assert(Math.abs(afterPitch - beforePitch) < 0.004, `Manual pitch drifted: before=${beforePitch} after=${afterPitch}`);
   assert(Math.abs(afterTargetY - beforeTargetY) < 0.08, `Camera target Y drifted: before=${beforeTargetY} after=${afterTargetY}`);
 
+  await page.evaluate(async () => {
+    window.__setCinematic?.(false);
+    window.__setOrbitView?.({ azimuth: 0, polar: 1.28, distance: 12.4 });
+    await new Promise((resolve) => window.setTimeout(resolve, 120));
+  });
+
+  const canvas = page.locator("#gl");
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error("Main canvas unavailable for drag regression");
+
+  const startX = bounds.x + bounds.width * 0.5;
+  const startY = bounds.y + bounds.height * 0.5;
+  const dragBefore = await page.evaluate(() => window.__getOrbitView?.());
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 140, startY, { steps: 18 });
+  await page.mouse.up();
+  await page.waitForTimeout(160);
+  const dragAfter = await page.evaluate(() => window.__getOrbitView?.());
+
+  assert(
+    dragAfter.azimuth > dragBefore.azimuth + 0.18,
+    `Dragging right should increase azimuth, before=${dragBefore.azimuth} after=${dragAfter.azimuth}`,
+  );
+
   console.log("Camera regression OK.");
   console.log(JSON.stringify({
     beforePitch,
@@ -99,6 +124,8 @@ try {
     afterTargetY,
     beforeCinematicMix: before.cinematicMix,
     afterCinematicMix: after.cinematicMix,
+    dragBeforeAzimuth: dragBefore.azimuth,
+    dragAfterAzimuth: dragAfter.azimuth,
   }, null, 2));
 } finally {
   await browser?.close();

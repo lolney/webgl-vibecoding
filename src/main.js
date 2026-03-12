@@ -2485,6 +2485,19 @@ window.__setDiagnosticsVisible = (visible) => {
   diagnosticsVisible = Boolean(visible);
   diagnosticsPanel.setVisible(diagnosticsVisible);
 };
+function getCurrentOrbitView() {
+  return {
+    azimuth: activeSceneKey === "binarySurface"
+      ? Math.atan2(surfaceLookDir.x, surfaceLookDir.z)
+      : controls.getAzimuthalAngle(),
+    polar: activeSceneKey === "binarySurface"
+      ? ((Math.PI / 2) - Math.asin(THREE.MathUtils.clamp(surfaceLookDir.y, -1, 1)))
+      : controls.getPolarAngle(),
+    distance: camera.position.distanceTo(controls.target),
+    target: controls.target.toArray(),
+  };
+}
+window.__getOrbitView = () => getCurrentOrbitView();
 window.__setOrbitView = (view = {}) => {
   const azimuth = Number.isFinite(view.azimuth) ? view.azimuth : 0;
   const defaultPolar = activeSceneKey === "binarySurface" ? 1.35 : Math.PI * 0.52;
@@ -2517,16 +2530,7 @@ window.__setOrbitView = (view = {}) => {
     camera.up.set(0, 1, 0);
     controls.update();
   }
-  return {
-    azimuth: activeSceneKey === "binarySurface"
-      ? Math.atan2(surfaceLookDir.x, surfaceLookDir.z)
-      : controls.getAzimuthalAngle(),
-    polar: activeSceneKey === "binarySurface"
-      ? ((Math.PI / 2) - Math.asin(THREE.MathUtils.clamp(surfaceLookDir.y, -1, 1)))
-      : controls.getPolarAngle(),
-    distance: camera.position.distanceTo(controls.target),
-    target: controls.target.toArray(),
-  };
+  return getCurrentOrbitView();
 };
 if (pendingInitialOrbitView && activeSceneKey === "binaryExternal") {
   window.__setOrbitView(pendingInitialOrbitView);
