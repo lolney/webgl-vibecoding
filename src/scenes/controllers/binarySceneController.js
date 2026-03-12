@@ -98,6 +98,8 @@ export function updateBinaryScene(ctx, frame) {
     aerialPerspective,
     volumetrics,
   } = lighting;
+  const primaryVisibleFraction = 1 - orbit.primaryOcclusionFraction;
+  const secondaryVisibleFraction = 1 - orbit.secondaryOcclusionFraction;
 
   starAGroup.position.copy(orbit.starAPosition);
   starBGroup.position.copy(orbit.starBPosition);
@@ -105,20 +107,28 @@ export function updateBinaryScene(ctx, frame) {
   binaryStarBLight.position.copy(starBGroup.position);
 
   if (starAVisual?.core?.material?.uniforms) {
-    starAVisual.core.material.uniforms.uCore.value.copy(primary.apparentColor).lerp(new THREE.Color(0xfff9e5), 0.28);
-    starAVisual.core.material.uniforms.uGlow.value.copy(primary.apparentColor);
+    starAVisual.core.material.uniforms.uCore.value.copy(primary.apparentColor).lerp(new THREE.Color(0xfff9e5), 0.28)
+      .multiplyScalar(THREE.MathUtils.lerp(0.16, 1.0, primaryVisibleFraction));
+    starAVisual.core.material.uniforms.uGlow.value.copy(primary.apparentColor)
+      .multiplyScalar(THREE.MathUtils.lerp(0.08, 1.0, primaryVisibleFraction));
     starAVisual.innerShell.material.uniforms.uColor.value.copy(primary.apparentColor);
-    starAVisual.innerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.16, 0.34, primary.horizonFactor + primary.visibleFactor * 0.18);
+    starAVisual.innerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.16, 0.34, primary.horizonFactor + primary.visibleFactor * 0.18)
+      * primaryVisibleFraction;
     starAVisual.outerShell.material.uniforms.uColor.value.copy(primary.apparentColor).lerp(new THREE.Color(0xffd59a), 0.22);
-    starAVisual.outerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.08, 0.18, primary.horizonFactor + primary.visibleFactor * 0.12);
+    starAVisual.outerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.08, 0.18, primary.horizonFactor + primary.visibleFactor * 0.12)
+      * primaryVisibleFraction;
   }
   if (starBVisual?.core?.material?.uniforms) {
-    starBVisual.core.material.uniforms.uCore.value.copy(secondary.apparentColor).lerp(new THREE.Color(0xe7efff), 0.2);
-    starBVisual.core.material.uniforms.uGlow.value.copy(secondary.apparentColor);
+    starBVisual.core.material.uniforms.uCore.value.copy(secondary.apparentColor).lerp(new THREE.Color(0xe7efff), 0.2)
+      .multiplyScalar(THREE.MathUtils.lerp(0.16, 1.0, secondaryVisibleFraction));
+    starBVisual.core.material.uniforms.uGlow.value.copy(secondary.apparentColor)
+      .multiplyScalar(THREE.MathUtils.lerp(0.08, 1.0, secondaryVisibleFraction));
     starBVisual.innerShell.material.uniforms.uColor.value.copy(secondary.apparentColor);
-    starBVisual.innerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.12, 0.24, secondary.horizonFactor + secondary.visibleFactor * 0.14);
+    starBVisual.innerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.12, 0.24, secondary.horizonFactor + secondary.visibleFactor * 0.14)
+      * secondaryVisibleFraction;
     starBVisual.outerShell.material.uniforms.uColor.value.copy(secondary.apparentColor).lerp(new THREE.Color(0xb0c9ff), 0.18);
-    starBVisual.outerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.06, 0.13, secondary.horizonFactor + secondary.visibleFactor * 0.1);
+    starBVisual.outerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.06, 0.13, secondary.horizonFactor + secondary.visibleFactor * 0.1)
+      * secondaryVisibleFraction;
   }
 
   planetPivot.position.copy(orbit.planetPosition);
@@ -176,10 +186,11 @@ export function updateBinaryScene(ctx, frame) {
   }
 
   if (isExternalScene) {
-    binaryStarALight.intensity = 8600;
-    binaryStarBLight.intensity = 6400;
+    binaryStarALight.intensity = 8600 * primaryVisibleFraction;
+    binaryStarBLight.intensity = 6400 * secondaryVisibleFraction;
     binaryFill.intensity = 0.0;
-    planetAtmosphere.material.uniforms.uIntensity.value = aerialPerspective.external.atmosphereBoost;
+    planetAtmosphere.material.uniforms.uIntensity.value = aerialPerspective.external.atmosphereBoost
+      * THREE.MathUtils.lerp(0.5, 1.0, Math.max(primaryVisibleFraction, secondaryVisibleFraction));
   } else {
     binaryStarALight.intensity = illumination.primaryLightIntensity;
     binaryStarBLight.intensity = illumination.secondaryLightIntensity;
@@ -469,6 +480,12 @@ export function updateBinaryScene(ctx, frame) {
     seasonDay: orbit.seasonDay,
     seasonPhase: orbit.seasonPhase,
     secondStrength: secondary.directIlluminanceLux / 100000,
+    primaryOcclusionFraction: orbit.primaryOcclusionFraction,
+    secondaryOcclusionFraction: orbit.secondaryOcclusionFraction,
+    primaryTransitFraction: orbit.primaryTransitFraction,
+    secondaryTransitFraction: orbit.secondaryTransitFraction,
+    primaryStarEclipseFraction: orbit.primaryStarEclipseFraction,
+    secondaryStarEclipseFraction: orbit.secondaryStarEclipseFraction,
     scene: activeSceneKey,
     time24: format24Hour(binaryDayHours),
     primaryAltitudeDeg: primary.altitudeDeg,

@@ -141,6 +141,42 @@ export const binaryPresets = [
     },
   },
   {
+    key: "external-eclipse-ingress",
+    scene: "binaryExternal",
+    label: "External // Eclipse Ingress",
+    state: {
+      binaryDayHours: 12.0,
+      simulationDays: 4.5,
+      multiplier: 1,
+      cinematic: false,
+      orbitView: { azimuth: 0.049, polar: 1.45, distance: 26, targetX: 0, targetY: 0, targetZ: 0 },
+    },
+  },
+  {
+    key: "external-eclipse-totality",
+    scene: "binaryExternal",
+    label: "External // Eclipse Totality",
+    state: {
+      binaryDayHours: 12.0,
+      simulationDays: 5.0,
+      multiplier: 1,
+      cinematic: false,
+      orbitView: { azimuth: 0.049, polar: 1.45, distance: 26, targetX: 0, targetY: 0, targetZ: 0 },
+    },
+  },
+  {
+    key: "external-eclipse-egress",
+    scene: "binaryExternal",
+    label: "External // Eclipse Egress",
+    state: {
+      binaryDayHours: 12.0,
+      simulationDays: 5.5,
+      multiplier: 1,
+      cinematic: false,
+      orbitView: { azimuth: 0.049, polar: 1.45, distance: 26, targetX: 0, targetY: 0, targetZ: 0 },
+    },
+  },
+  {
     key: "external-conjunction",
     scene: "binaryExternal",
     label: "External // Conjunction",

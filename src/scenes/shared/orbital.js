@@ -63,6 +63,59 @@ function phaseFractionFromDirections(lightDir, viewDir) {
   return THREE.MathUtils.clamp((1 + lightDir.dot(viewDir)) * 0.5, 0, 1);
 }
 
+function apparentDisc(position, cameraPosition, radius) {
+  const toBody = position.clone().sub(cameraPosition);
+  const distance = Math.max(1e-6, toBody.length());
+  return {
+    dir: toBody.normalize(),
+    distance,
+    angularRadius: Math.asin(Math.min(0.999, radius / distance)),
+  };
+}
+
+function overlapFraction(foregroundRadius, backgroundRadius, separation) {
+  if (separation >= foregroundRadius + backgroundRadius) return 0;
+  if (separation <= Math.abs(foregroundRadius - backgroundRadius)) {
+    return THREE.MathUtils.clamp(
+      (Math.min(foregroundRadius, backgroundRadius) ** 2) / (backgroundRadius ** 2),
+      0,
+      1,
+    );
+  }
+  const a1 = Math.acos(THREE.MathUtils.clamp(
+    (separation * separation + foregroundRadius * foregroundRadius - backgroundRadius * backgroundRadius)
+      / (2 * separation * foregroundRadius),
+    -1,
+    1,
+  ));
+  const a2 = Math.acos(THREE.MathUtils.clamp(
+    (separation * separation + backgroundRadius * backgroundRadius - foregroundRadius * foregroundRadius)
+      / (2 * separation * backgroundRadius),
+    -1,
+    1,
+  ));
+  const area = foregroundRadius * foregroundRadius * a1
+    + backgroundRadius * backgroundRadius * a2
+    - 0.5 * Math.sqrt(Math.max(
+      0,
+      (-separation + foregroundRadius + backgroundRadius)
+        * (separation + foregroundRadius - backgroundRadius)
+        * (separation - foregroundRadius + backgroundRadius)
+        * (separation + foregroundRadius + backgroundRadius),
+    ));
+  return THREE.MathUtils.clamp(area / (Math.PI * backgroundRadius * backgroundRadius), 0, 1);
+}
+
+function occlusionFraction(foregroundDisc, backgroundDisc) {
+  if (foregroundDisc.distance >= backgroundDisc.distance) return 0;
+  const separation = Math.acos(THREE.MathUtils.clamp(
+    foregroundDisc.dir.dot(backgroundDisc.dir),
+    -1,
+    1,
+  ));
+  return overlapFraction(foregroundDisc.angularRadius, backgroundDisc.angularRadius, separation);
+}
+
 export function computeBinarySimulationState({
   binaryDayHours,
   simulationDays = null,
@@ -75,6 +128,9 @@ export function computeBinarySimulationState({
   viewerHeadingYaw = null,
   viewerPitch = 0,
 }) {
+  const starARadius = 1.3;
+  const starBRadius = 1.05;
+  const planetRadius = 0.65;
   const dayPhase = THREE.MathUtils.euclideanModulo(binaryDayHours, 24) / 24;
   const localHourAngle = (dayPhase - 0.5) * TAU + observerLongitude;
   const simDays = Number.isFinite(simulationDays) ? simulationDays : (binaryDayHours / 24);
@@ -167,6 +223,15 @@ export function computeBinarySimulationState({
   cameraFromPlanet.normalize();
   const phaseFractionA = phaseFractionFromDirections(toA, cameraFromPlanet);
   const phaseFractionB = phaseFractionFromDirections(toB, cameraFromPlanet);
+  const apparentPlanet = apparentDisc(planetPosition, cameraPosition, planetRadius);
+  const apparentStarA = apparentDisc(starAPosition, cameraPosition, starARadius);
+  const apparentStarB = apparentDisc(starBPosition, cameraPosition, starBRadius);
+  const primaryTransitFraction = occlusionFraction(apparentPlanet, apparentStarA);
+  const secondaryTransitFraction = occlusionFraction(apparentPlanet, apparentStarB);
+  const primaryStarEclipseFraction = occlusionFraction(apparentStarB, apparentStarA);
+  const secondaryStarEclipseFraction = occlusionFraction(apparentStarA, apparentStarB);
+  const primaryOcclusionFraction = THREE.MathUtils.clamp(primaryTransitFraction + primaryStarEclipseFraction, 0, 1);
+  const secondaryOcclusionFraction = THREE.MathUtils.clamp(secondaryTransitFraction + secondaryStarEclipseFraction, 0, 1);
   const combinedPhaseFraction = THREE.MathUtils.clamp(
     ((phaseFractionA * weightA) + (phaseFractionB * weightB)) / Math.max(1e-6, weightA + weightB),
     0,
@@ -257,6 +322,12 @@ export function computeBinarySimulationState({
     phaseFractionA,
     phaseFractionB,
     combinedPhaseFraction,
+    primaryTransitFraction,
+    secondaryTransitFraction,
+    primaryStarEclipseFraction,
+    secondaryStarEclipseFraction,
+    primaryOcclusionFraction,
+    secondaryOcclusionFraction,
     primaryLocalDir,
     secondaryLocalDir,
     siteDirWorld,
