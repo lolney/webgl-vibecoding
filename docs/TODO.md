@@ -74,3 +74,25 @@
     - [ ] Timeline-driven camera direction
     - [ ] Restrained audio-reactive modulation of physically-based effects
     - [ ] Capture / showcase tooling for scripted hero renders and clips
+  - [ ] Execution plan
+    - [ ] Phase A: rendering foundation
+      - [ ] Upgrade the atmospheric model first so later scenes and phenomena share one sky/air transport model
+      - [ ] Follow with ocean/material BRDF work so reflections and surfaces respond coherently to the new lighting
+      - [ ] Keep regression coverage expanding in parallel with each rendering change
+    - [ ] Phase B: showcase physical phenomena on top of the improved renderer
+      - [ ] Add seasonal and phase-based behavior before scene-specific spectacles so the core simulation becomes more expressive
+      - [ ] Then add eclipse/transit behavior because it exercises orbital geometry, atmospheric response, and presentation at once
+      - [ ] Add aurora/weather only after the base sky/water/light transport is stable enough to absorb more volumetric complexity
+    - [ ] Phase C: build new scenes from the improved primitives
+      - [ ] Start with the eclipse scene because it reuses the binary system and has the strongest visual payoff
+      - [ ] Follow with the gas giant moonrise scene to showcase large-scale lighting, atmospherics, and reflected light
+      - [ ] Use the ice moon scene as the material/volumetric stress test once the BRDF stack is stronger
+    - [ ] Phase D: authored presentation
+      - [ ] Add timeline-driven sequencing after there are enough strong scenes to cut between
+      - [ ] Layer restrained audio-reactive modulation onto the authored timeline rather than onto raw simulation state
+      - [ ] Finish with capture/showcase tooling so output generation matches the final presentation model
+    - [ ] Validation gates
+      - [ ] Every phase should add deterministic headless captures plus debug metrics for the new effect class
+      - [ ] Every new scene should have at least one stable desktop preset and one stable mobile preset before sign-off
+      - [ ] Scene additions should not regress URL state sync, scene chooser behavior, or diagnostics overlays
+  - [ ] See `docs/next-level-plan.md` for the detailed rollout plan, dependency order, and acceptance criteria
