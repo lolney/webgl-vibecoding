@@ -66,7 +66,7 @@
     - [ ] Eclipses and transits
     - [x] Seasonal axial-tilt behavior and solstice/equinox presets
     - [x] Planetary phases and reflected light
-    - [ ] Tidal / orbital resonance cues
+    - [x] Tidal / orbital resonance cues
     - [ ] Aurora / upper-atmosphere glow
     - [ ] Weather volumes
   - [ ] Presentation / demoscene escalation

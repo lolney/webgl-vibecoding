@@ -76,6 +76,9 @@ export function createOrbitSchematic({ root = document } = {}) {
     const viewerLightDot = Number(data.viewerLightDot) || 0;
     const primaryAltitudeDeg = Number(data.primaryAltitudeDeg) || 0;
     const secondaryAltitudeDeg = Number(data.secondaryAltitudeDeg) || 0;
+    const resonanceLabel = data.resonanceLabel || "13:2";
+    const resonanceStrength = Math.max(0, Math.min(1, Number(data.resonanceStrength) || 0));
+    const resonanceWindow = Math.max(0, Math.min(1, Number(data.resonanceWindow) || 0));
     const orbitalR = Math.max(0.001, Number(data.orbitRadius) || 1);
     const dynamicR = Math.max(
       orbitalR,
@@ -101,6 +104,14 @@ export function createOrbitSchematic({ root = document } = {}) {
     ctx.beginPath();
     ctx.arc(cx, cy, orbitalR * scale, 0, Math.PI * 2);
     ctx.stroke();
+    if (resonanceWindow > 0.001) {
+      ctx.strokeStyle = `rgba(255, 220, 120, ${0.14 + resonanceWindow * 0.5})`;
+      ctx.lineWidth = 1.5 + resonanceWindow * 1.2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, orbitalR * scale + 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
 
     const [sxA, syA] = p(starA);
     const [sxB, syB] = p(starB);
@@ -184,6 +195,21 @@ export function createOrbitSchematic({ root = document } = {}) {
     ctx.fillText("sun", 44, h - 20);
     ctx.fillStyle = "rgba(255, 244, 110, 0.95)";
     ctx.fillText("viewer", 76, h - 20);
+
+    const meterW = 74;
+    const meterH = 8;
+    const meterX = w - meterW - 16;
+    const meterY = 14;
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(214, 233, 255, 0.88)";
+    ctx.fillText(`${resonanceLabel} near-res`, w - 16, 16);
+    ctx.fillStyle = "rgba(14, 24, 48, 0.88)";
+    ctx.fillRect(meterX, meterY + 7, meterW, meterH);
+    ctx.strokeStyle = "rgba(120, 170, 255, 0.42)";
+    ctx.strokeRect(meterX, meterY + 7, meterW, meterH);
+    ctx.fillStyle = `rgba(255, 218, 119, ${0.5 + resonanceStrength * 0.4})`;
+    ctx.fillRect(meterX, meterY + 7, meterW * resonanceStrength, meterH);
+    ctx.textAlign = "left";
   }
 
   resizeCanvas();

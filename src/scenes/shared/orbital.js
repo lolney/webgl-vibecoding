@@ -6,6 +6,8 @@ const PLANET_YEAR_DAYS = 220;
 const AXIAL_TILT = THREE.MathUtils.degToRad(18);
 const STAR_A_LUMINOSITY = 1.0;
 const STAR_B_LUMINOSITY = 0.42;
+const RESONANCE_BINARY_CYCLES = 13;
+const RESONANCE_PLANET_CYCLES = 2;
 
 export { PLANET_YEAR_DAYS };
 
@@ -140,6 +142,12 @@ export function computeBinarySimulationState({
   // One continuous model drives all motion: slow orbital progression, fast planetary spin.
   const binaryAngle = simDays * (TAU / BINARY_ORBIT_PERIOD_DAYS) + 0.52;
   const planetAngle = simDays * (TAU / PLANET_YEAR_DAYS) + 0.7;
+  const resonancePhase = THREE.MathUtils.euclideanModulo(
+    (binaryAngle * RESONANCE_PLANET_CYCLES) - (planetAngle * RESONANCE_BINARY_CYCLES),
+    TAU,
+  );
+  const resonanceStrength = 0.5 + 0.5 * Math.cos(resonancePhase);
+  const resonanceWindow = smoothstep(0.74, 0.98, resonanceStrength);
 
   const starAPosition = new THREE.Vector3(
     Math.cos(binaryAngle) * 4.1,
@@ -287,6 +295,10 @@ export function computeBinarySimulationState({
     dayPhase,
     seasonDay,
     seasonPhase,
+    resonanceLabel: `${RESONANCE_BINARY_CYCLES}:${RESONANCE_PLANET_CYCLES}`,
+    resonancePhase,
+    resonanceStrength,
+    resonanceWindow,
     spinYaw: localHourAngle,
     viewerTurnYaw: resolvedTurnYaw,
     observerYaw,
