@@ -64,7 +64,7 @@
     - [ ] Gas giant moonrise scene
   - [ ] Physical / astronomical phenomena
     - [ ] Eclipses and transits
-    - [ ] Seasonal axial-tilt behavior and solstice/equinox presets
+    - [x] Seasonal axial-tilt behavior and solstice/equinox presets
     - [ ] Planetary phases and reflected light
     - [ ] Tidal / orbital resonance cues
     - [ ] Aurora / upper-atmosphere glow
@@ -80,7 +80,7 @@
       - [ ] Follow with ocean/material BRDF work so reflections and surfaces respond coherently to the new lighting
       - [ ] Keep regression coverage expanding in parallel with each rendering change
     - [ ] Phase B: showcase physical phenomena on top of the improved renderer
-      - [ ] Add seasonal and phase-based behavior before scene-specific spectacles so the core simulation becomes more expressive
+      - [x] Add seasonal and phase-based behavior before scene-specific spectacles so the core simulation becomes more expressive
       - [ ] Then add eclipse/transit behavior because it exercises orbital geometry, atmospheric response, and presentation at once
       - [ ] Add aurora/weather only after the base sky/water/light transport is stable enough to absorb more volumetric complexity
     - [ ] Phase C: build new scenes from the improved primitives

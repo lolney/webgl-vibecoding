@@ -2731,6 +2731,9 @@ function tick() {
     sceneDebug.secondaryAltitudeDeg !== undefined
       ? `sun B alt ${sceneDebug.secondaryAltitudeDeg.toFixed(1)} az ${sceneDebug.secondaryAzimuthDeg.toFixed(1)}`
       : "sun B alt --.- az --.-",
+    sceneDebug.primaryDeclinationDeg !== undefined
+      ? `season day ${sceneDebug.seasonDay.toFixed(1)} decl A ${sceneDebug.primaryDeclinationDeg.toFixed(1)} B ${sceneDebug.secondaryDeclinationDeg.toFixed(1)}`
+      : "season day --.- decl A --.- B --.-",
     sceneDebug.lighting
       ? `airmass A ${sceneDebug.lighting.primaryAirMass.toFixed(2)} B ${sceneDebug.lighting.secondaryAirMass.toFixed(2)}`
       : "airmass A --.-- B --.--",

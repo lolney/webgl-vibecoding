@@ -11,6 +11,9 @@ const cases = [
   { preset: "surface-sunset", name: "lighting-sunset" },
   { preset: "surface-second-sun", name: "lighting-second-sun" },
   { preset: "surface-night", name: "lighting-night" },
+  { preset: "surface-summer-solstice", name: "lighting-summer-solstice" },
+  { preset: "surface-equinox", name: "lighting-equinox" },
+  { preset: "surface-winter-solstice", name: "lighting-winter-solstice" },
 ];
 
 for (const entry of cases) {
@@ -32,6 +35,9 @@ const noon = readDebug("lighting-noon");
 const sunset = readDebug("lighting-sunset");
 const secondSun = readDebug("lighting-second-sun");
 const night = readDebug("lighting-night");
+const summer = readDebug("lighting-summer-solstice");
+const equinox = readDebug("lighting-equinox");
+const winter = readDebug("lighting-winter-solstice");
 
 function assert(condition, message) {
   if (!condition) {
@@ -81,6 +87,13 @@ assert(secondSun.primaryAltitudeDeg < 0, "Second-sun preset should keep primary 
 assert(night.lighting.daylightFactor < 0.05, "Night preset should have negligible daylight factor");
 assert(night.lighting.exposure < noon.lighting.exposure, "Night exposure should remain below noon exposure");
 assert(noon.lighting.primaryLightIntensity > noon.lighting.secondaryLightIntensity, "Primary local light should dominate secondary at noon");
+assert(summer.primaryDeclinationDeg > 10, "Summer solstice should yield materially positive declination");
+assert(winter.primaryDeclinationDeg < -10, "Winter solstice should yield materially negative declination");
+assert(Math.abs(equinox.primaryDeclinationDeg) < 2.5, "Equinox should keep primary declination near zero");
+assert(summer.primaryAltitudeDeg > equinox.primaryAltitudeDeg + 10, "Summer noon altitude should exceed equinox at high latitude");
+assert(equinox.primaryAltitudeDeg > winter.primaryAltitudeDeg + 10, "Equinox noon altitude should exceed winter at high latitude");
+assert(summer.seasonDay > winter.seasonDay, "Season day should advance monotonically from winter to summer preset");
+assert(summer.seasonPhase > winter.seasonPhase, "Season phase should advance monotonically from winter to summer preset");
 
 console.log("Lighting regression OK.");
 console.log(JSON.stringify({
@@ -89,4 +102,19 @@ console.log(JSON.stringify({
   sunset: sunset.lighting,
   secondSun: secondSun.lighting,
   night: night.lighting,
+  summer: {
+    seasonDay: summer.seasonDay,
+    primaryDeclinationDeg: summer.primaryDeclinationDeg,
+    primaryAltitudeDeg: summer.primaryAltitudeDeg,
+  },
+  equinox: {
+    seasonDay: equinox.seasonDay,
+    primaryDeclinationDeg: equinox.primaryDeclinationDeg,
+    primaryAltitudeDeg: equinox.primaryAltitudeDeg,
+  },
+  winter: {
+    seasonDay: winter.seasonDay,
+    primaryDeclinationDeg: winter.primaryDeclinationDeg,
+    primaryAltitudeDeg: winter.primaryAltitudeDeg,
+  },
 }, null, 2));

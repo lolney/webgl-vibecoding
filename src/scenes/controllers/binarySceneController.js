@@ -448,11 +448,15 @@ export function updateBinaryScene(ctx, frame) {
 
   return {
     dayPhase: orbit.dayPhase,
+    seasonDay: orbit.seasonDay,
+    seasonPhase: orbit.seasonPhase,
     secondStrength: secondary.directIlluminanceLux / 100000,
     scene: activeSceneKey,
     time24: format24Hour(binaryDayHours),
     primaryAltitudeDeg: primary.altitudeDeg,
     secondaryAltitudeDeg: secondary.altitudeDeg,
+    primaryDeclinationDeg: THREE.MathUtils.radToDeg(orbit.primaryDeclination),
+    secondaryDeclinationDeg: THREE.MathUtils.radToDeg(orbit.secondaryDeclination),
     primaryAzimuthDeg: primary.azimuthDeg,
     secondaryAzimuthDeg: secondary.azimuthDeg,
     schematic: {
@@ -465,6 +469,8 @@ export function updateBinaryScene(ctx, frame) {
       viewerLightDot: orbit.viewerLightDot,
       primaryAltitudeDeg: primary.altitudeDeg,
       secondaryAltitudeDeg: secondary.altitudeDeg,
+      primaryDeclinationDeg: THREE.MathUtils.radToDeg(orbit.primaryDeclination),
+      secondaryDeclinationDeg: THREE.MathUtils.radToDeg(orbit.secondaryDeclination),
       viewerTurnYaw: orbit.viewerTurnYaw,
       spinYaw: orbit.spinYaw,
       viewerYaw: orbit.viewerYaw,

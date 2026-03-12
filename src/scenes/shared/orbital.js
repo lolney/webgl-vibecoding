@@ -7,6 +7,8 @@ const AXIAL_TILT = THREE.MathUtils.degToRad(18);
 const STAR_A_LUMINOSITY = 1.0;
 const STAR_B_LUMINOSITY = 0.42;
 
+export { PLANET_YEAR_DAYS };
+
 function smoothstep(edge0, edge1, x) {
   const t = THREE.MathUtils.clamp((x - edge0) / (edge1 - edge0), 0, 1);
   return t * t * (3 - 2 * t);
@@ -53,6 +55,10 @@ function buildContinuousLocalFrame(observerNormal, travelNorth) {
   return { east, north };
 }
 
+function declinationFromDirection(direction, spinAxis) {
+  return Math.asin(THREE.MathUtils.clamp(direction.dot(spinAxis), -1, 1));
+}
+
 export function computeBinarySimulationState({
   binaryDayHours,
   simulationDays = null,
@@ -68,6 +74,8 @@ export function computeBinarySimulationState({
   const dayPhase = THREE.MathUtils.euclideanModulo(binaryDayHours, 24) / 24;
   const localHourAngle = (dayPhase - 0.5) * TAU + observerLongitude;
   const simDays = Number.isFinite(simulationDays) ? simulationDays : (binaryDayHours / 24);
+  const seasonDay = THREE.MathUtils.euclideanModulo(simDays, PLANET_YEAR_DAYS);
+  const seasonPhase = seasonDay / PLANET_YEAR_DAYS;
 
   // One continuous model drives all motion: slow orbital progression, fast planetary spin.
   const binaryAngle = simDays * (TAU / BINARY_ORBIT_PERIOD_DAYS) + 0.52;
@@ -156,6 +164,8 @@ export function computeBinarySimulationState({
 
   const altitudeA = Math.asin(THREE.MathUtils.clamp(toA.dot(observerNormal), -1, 1));
   const altitudeB = Math.asin(THREE.MathUtils.clamp(toB.dot(observerNormal), -1, 1));
+  const primaryDeclination = declinationFromDirection(toA, spinAxis);
+  const secondaryDeclination = declinationFromDirection(toB, spinAxis);
   const incidenceA = Math.max(0, Math.sin(altitudeA));
   const incidenceB = Math.max(0, Math.sin(altitudeB));
   const lightA = incidenceA * weightA;
@@ -194,6 +204,8 @@ export function computeBinarySimulationState({
 
   return {
     dayPhase,
+    seasonDay,
+    seasonPhase,
     spinYaw: localHourAngle,
     viewerTurnYaw: resolvedTurnYaw,
     observerYaw,
@@ -230,6 +242,8 @@ export function computeBinarySimulationState({
     siteDirWorld,
     primaryAltitude: altitudeA,
     secondaryAltitude: altitudeB,
+    primaryDeclination,
+    secondaryDeclination,
     primaryAzimuth,
     secondaryAzimuth,
     orbitRadius: planetOrbitRadius,
