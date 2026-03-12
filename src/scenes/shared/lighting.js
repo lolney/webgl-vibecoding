@@ -221,65 +221,101 @@ function computeSkyResponse({ daylight, twilight, haze, horizonWarmth, primary, 
   };
 }
 
-function computeSurfaceResponse({ daylight, primary, secondary, orbit }) {
+function computeSurfaceResponse({ transport, skyResponse, primary, secondary, orbit }) {
   const surfaceNormal = new THREE.Vector3(0, 1, 0);
   const viewToEye = orbit.lookLocal.clone().negate().normalize();
   const viewCosSurface = clamp01(Math.abs(orbit.lookLocal.y));
   const waterFresnel = schlickFresnel(viewCosSurface, 0.021);
   const primaryReflectionDir = reflectLocal(orbit.primaryLocalDir, surfaceNormal);
   const secondaryReflectionDir = reflectLocal(orbit.secondaryLocalDir, surfaceNormal);
-  const roughnessNear = 0.18;
-  const roughnessFar = 0.26;
+  const roughnessNear = THREE.MathUtils.clamp(
+    0.08 + transport.haze * 0.07 + transport.twilight * 0.05 + waterFresnel * 0.04,
+    0.08,
+    0.24,
+  );
+  const roughnessFar = THREE.MathUtils.clamp(roughnessNear + 0.08 + transport.twilight * 0.04, 0.16, 0.34);
   const primarySpecular = Math.pow(
     Math.max(0, primaryReflectionDir.dot(viewToEye)),
-    THREE.MathUtils.lerp(72, 18, roughnessNear),
+    THREE.MathUtils.lerp(180, 24, roughnessNear),
   );
   const secondarySpecular = Math.pow(
     Math.max(0, secondaryReflectionDir.dot(viewToEye)),
-    THREE.MathUtils.lerp(72, 18, roughnessNear),
+    THREE.MathUtils.lerp(180, 24, roughnessNear),
   );
   const combinedSunDirection = orbit.primaryLocalDir.clone().multiplyScalar(primary.directIlluminanceLux + 2000)
     .add(orbit.secondaryLocalDir.clone().multiplyScalar(secondary.directIlluminanceLux + 1200));
   if (combinedSunDirection.lengthSq() < 1e-6) combinedSunDirection.set(0.2, 0.92, 0.34);
   combinedSunDirection.normalize();
 
-  const primaryGlitter = primary.visibleFactor * waterFresnel * (0.12 + primarySpecular * 1.8);
-  const secondaryGlitter = secondary.visibleFactor * waterFresnel * (0.1 + secondarySpecular * 1.6);
+  const primaryTrailGain = primary.visibleFactor
+    * primary.reflectionGain
+    * waterFresnel
+    * (0.08 + primarySpecular * 2.4);
+  const secondaryTrailGain = secondary.visibleFactor
+    * secondary.reflectionGain
+    * waterFresnel
+    * (0.06 + secondarySpecular * 2.15);
+  const primaryGlitter = primaryTrailGain * (0.52 + primary.horizonFactor * 0.42);
+  const secondaryGlitter = secondaryTrailGain * (0.48 + secondary.horizonFactor * 0.38);
   const glitterBlend = clamp01(primaryGlitter + secondaryGlitter * 0.82);
-  const skyReflectivity = THREE.MathUtils.lerp(0.08, 0.42, waterFresnel);
-  const nearWaterBase = daylight > 0.35 ? new THREE.Color(0x08243a) : new THREE.Color(0x061321);
-  const farWaterBase = daylight > 0.35 ? new THREE.Color(0x0d314b) : new THREE.Color(0x08192b);
-  const skyTintNear = new THREE.Color(0x6f94bc).multiplyScalar(skyReflectivity * (0.1 + daylight * 0.14));
-  const skyTintFar = new THREE.Color(0x90b1d8).multiplyScalar(skyReflectivity * (0.18 + daylight * 0.18));
-  const primarySpecGain = primary.visibleFactor * waterFresnel * primarySpecular;
-  const secondarySpecGain = secondary.visibleFactor * waterFresnel * secondarySpecular;
+  const skyReflectionGain = clamp01(
+    THREE.MathUtils.lerp(0.12, 0.84, waterFresnel)
+      * (0.28 + transport.daylight * 0.36 + transport.twilight * 0.28 + transport.haze * 0.14),
+  );
+  const horizonReflectColor = skyResponse.horizonColor.clone()
+    .lerp(skyResponse.multiScatterColor, transport.twilight * 0.25);
+  const zenithReflectColor = skyResponse.zenithColor.clone()
+    .lerp(skyResponse.multiScatterColor, transport.daylight * 0.14);
+  const nearWaterBase = new THREE.Color(0x04111b)
+    .lerp(new THREE.Color(0x08243a), transport.daylight * 0.75 + transport.twilight * 0.25);
+  const farWaterBase = new THREE.Color(0x071a29)
+    .lerp(new THREE.Color(0x113852), transport.daylight * 0.72 + transport.twilight * 0.28);
+  const nearWaterColor = nearWaterBase.clone().lerp(
+    zenithReflectColor.clone().lerp(horizonReflectColor, 0.68),
+    skyReflectionGain * 0.34,
+  );
+  const farWaterColor = farWaterBase.clone().lerp(
+    horizonReflectColor.clone().lerp(zenithReflectColor, 0.22),
+    skyReflectionGain * 0.6,
+  );
+  const primarySpecGain = primaryTrailGain;
+  const secondarySpecGain = secondaryTrailGain;
+  const waterSunColor = apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.18)
+    .multiplyScalar(0.02 + primarySpecGain * 0.9 + secondarySpecGain * 0.52);
+  const farWaterSunColor = apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.26)
+    .multiplyScalar(0.03 + primarySpecGain * 1.18 + secondarySpecGain * 0.72);
+  const glitterWidth = THREE.MathUtils.lerp(0.16, 0.62, roughnessFar + waterFresnel * 0.18);
 
   return {
     combinedSunDirection,
     primaryGlitter,
     secondaryGlitter,
     glitterBlend,
-    waterSunColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.18)
-      .multiplyScalar(0.03 + (primarySpecGain + secondarySpecGain * 0.65) * 2.1),
-    farWaterSunColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.26)
-      .multiplyScalar(0.035 + (primarySpecGain + secondarySpecGain * 0.72) * 2.5),
-    nearWaterColor: nearWaterBase.add(skyTintNear),
-    farWaterColor: farWaterBase.add(skyTintFar),
-    distortionNear: THREE.MathUtils.lerp(0.28, 0.58, roughnessNear + waterFresnel * 0.22),
-    distortionFar: THREE.MathUtils.lerp(0.42, 0.82, roughnessFar + waterFresnel * 0.18),
-    sizeNear: THREE.MathUtils.lerp(1.6, 2.15, roughnessNear + waterFresnel * 0.18),
-    sizeFar: THREE.MathUtils.lerp(2.2, 2.95, roughnessFar + waterFresnel * 0.16),
-    scatterBandColor: apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.22)
-      .lerp(new THREE.Color(0xffdfb7), 0.34),
+    waterSunColor,
+    farWaterSunColor,
+    nearWaterColor,
+    farWaterColor,
+    distortionNear: THREE.MathUtils.lerp(0.22, 0.46, roughnessNear + skyReflectionGain * 0.12),
+    distortionFar: THREE.MathUtils.lerp(0.32, 0.64, roughnessFar + skyReflectionGain * 0.18),
+    sizeNear: THREE.MathUtils.lerp(1.45, 1.95, roughnessNear + skyReflectionGain * 0.08),
+    sizeFar: THREE.MathUtils.lerp(2.05, 2.7, roughnessFar + skyReflectionGain * 0.12),
+    scatterBandColor: horizonReflectColor.clone()
+      .lerp(apparentColorMix(primary.apparentColor, secondary.apparentColor, 0.24), 0.22),
     scatterBandOpacity: clamp01(
-      (0.008 + waterFresnel * 0.04)
-      * (0.18 + primary.horizonFactor * 0.42 + secondary.horizonFactor * 0.18),
+      (0.006 + skyReflectionGain * 0.018 + waterFresnel * 0.016)
+      * (0.16 + primary.horizonFactor * 0.34 + secondary.horizonFactor * 0.16 + transport.twilight * 0.22),
     ),
-    scatterBandDistance: THREE.MathUtils.lerp(92, 118, waterFresnel),
-    scatterBandHeight: THREE.MathUtils.lerp(5.5, 9.5, waterFresnel),
+    scatterBandDistance: THREE.MathUtils.lerp(88, 126, skyReflectionGain),
+    scatterBandHeight: THREE.MathUtils.lerp(5.0, 10.8, skyReflectionGain + transport.twilight * 0.18),
     waterFresnel,
+    skyReflectionGain,
     primarySpecular,
     secondarySpecular,
+    primaryTrailGain,
+    secondaryTrailGain,
+    roughnessNear,
+    roughnessFar,
+    glitterWidth,
   };
 }
 
@@ -472,7 +508,8 @@ export function computeLightingState(orbit) {
     secondary,
   });
   const surfaceResponse = computeSurfaceResponse({
-    daylight,
+    transport,
+    skyResponse,
     primary,
     secondary,
     orbit,
@@ -586,8 +623,14 @@ export function lightingDebugState(lighting) {
     secondaryReflectionGain: Number(lighting.surfaceOptics.secondaryReflectionGain.toFixed(4)),
     waterGlitterBlend: Number(lighting.surfaceResponse.glitterBlend.toFixed(4)),
     waterFresnel: Number(lighting.surfaceResponse.waterFresnel.toFixed(4)),
+    waterSkyReflectionGain: Number(lighting.surfaceResponse.skyReflectionGain.toFixed(4)),
     primarySpecular: Number(lighting.surfaceResponse.primarySpecular.toFixed(4)),
     secondarySpecular: Number(lighting.surfaceResponse.secondarySpecular.toFixed(4)),
+    primaryTrailGain: Number(lighting.surfaceResponse.primaryTrailGain.toFixed(4)),
+    secondaryTrailGain: Number(lighting.surfaceResponse.secondaryTrailGain.toFixed(4)),
+    waterRoughnessNear: Number(lighting.surfaceResponse.roughnessNear.toFixed(4)),
+    waterRoughnessFar: Number(lighting.surfaceResponse.roughnessFar.toFixed(4)),
+    waterGlitterWidth: Number(lighting.surfaceResponse.glitterWidth.toFixed(4)),
     surfaceHazeOpacity: Number(lighting.aerialPerspective.surface.hazeOpacity.toFixed(4)),
     externalFogDensity: Number(lighting.aerialPerspective.external.fogDensity.toFixed(4)),
     primaryShaftStrength: Number(lighting.volumetrics.primaryShaftStrength.toFixed(4)),

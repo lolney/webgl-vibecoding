@@ -56,7 +56,7 @@
   - [ ] Rendering realism upgrades
     - [x] Multi-order atmospheric scattering approximation
     - [x] True volumetric participating media for stars, moonlight, and clocktower beams
-    - [ ] Better ocean BRDF and reflected-sky integration
+    - [x] Better ocean BRDF and reflected-sky integration
     - [ ] Stronger material separation and PBR response across stars, planets, water, tower surfaces, and emissives
   - [ ] New scenes
     - [ ] Eclipse scene

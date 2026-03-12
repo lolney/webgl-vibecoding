@@ -59,8 +59,13 @@ assert(noon.lighting.extinctionBucketG < noon.lighting.extinctionBucketB, "Green
 assert(sunrise.lighting.waterGlitterBlend > night.lighting.waterGlitterBlend, "Sunrise water glitter should exceed night");
 assert(sunrise.lighting.primaryReflectionGain > night.lighting.primaryReflectionGain, "Primary reflection gain should exceed night");
 assert(sunrise.lighting.waterFresnel > noon.lighting.waterFresnel, "Sunrise Fresnel should exceed noon");
+assert(sunrise.lighting.waterSkyReflectionGain > noon.lighting.waterSkyReflectionGain, "Sunrise sky reflection gain should exceed noon");
 assert(sunrise.lighting.primarySpecular > noon.lighting.primarySpecular, "Sunrise primary specular should exceed noon");
+assert(sunset.lighting.primaryTrailGain > noon.lighting.primaryTrailGain, "Sunset primary trail gain should exceed noon");
+assert(secondSun.lighting.secondaryTrailGain > secondSun.lighting.primaryTrailGain, "Second-sun preset should bias trail gain toward the visible secondary");
 assert(secondSun.lighting.primarySpecular > secondSun.lighting.secondarySpecular, "Second-sun preset should bias glint toward the aligned star");
+assert(noon.lighting.waterRoughnessFar > noon.lighting.waterRoughnessNear, "Far-water roughness should exceed near-water roughness");
+assert(sunrise.lighting.waterGlitterWidth > noon.lighting.waterGlitterWidth, "Sunrise glitter width should exceed noon");
 assert(sunset.lighting.surfaceHazeOpacity > noon.lighting.surfaceHazeOpacity, "Sunset haze opacity should exceed noon");
 assert(night.lighting.surfaceHazeOpacity < sunset.lighting.surfaceHazeOpacity, "Night haze opacity should stay below sunset");
 assert(sunset.lighting.externalFogDensity > noon.lighting.externalFogDensity, "External fog density should rise toward sunset");

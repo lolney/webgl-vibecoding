@@ -282,7 +282,7 @@ export function updateBinaryScene(ctx, frame) {
 
       const primaryAhead = Math.max(0, orbit.primaryLocalDir.dot(surfaceForward));
       const primaryRight = orbit.primaryLocalDir.dot(surfaceRight);
-      const primaryReflection = primaryAhead * surfaceResponse.waterFresnel * (0.18 + surfaceResponse.primarySpecular * 2.4);
+      const primaryReflection = primaryAhead * surfaceResponse.primaryTrailGain * (0.42 + surfaceResponse.glitterWidth * 0.9);
       if (primaryReflection > 0.035) {
         surfaceReflectionA.visible = true;
         surfaceReflectionA.position.copy(camera.position)
@@ -290,8 +290,12 @@ export function updateBinaryScene(ctx, frame) {
           .add(surfaceRight.clone().multiplyScalar(primaryRight * 26));
         surfaceReflectionA.position.y = camera.position.y - 1.76;
         surfaceReflectionA.rotation.set(-Math.PI / 2, 0, -primaryRight * 0.16);
-        surfaceReflectionA.scale.set(0.42, 0.34, 1);
-        surfaceReflectionA.material.opacity = 0.004 + primaryReflection * 0.03;
+        surfaceReflectionA.scale.set(
+          0.38 + surfaceResponse.glitterWidth * 0.12,
+          0.28 + surfaceResponse.glitterWidth * 0.22,
+          1,
+        );
+        surfaceReflectionA.material.opacity = 0.003 + primaryReflection * 0.024;
       }
     }
 
@@ -328,7 +332,7 @@ export function updateBinaryScene(ctx, frame) {
 
       const secondaryAhead = Math.max(0, orbit.secondaryLocalDir.dot(surfaceForward));
       const secondaryRight = orbit.secondaryLocalDir.dot(surfaceRight);
-      const secondaryReflection = secondaryAhead * surfaceResponse.waterFresnel * (0.16 + surfaceResponse.secondarySpecular * 2.1);
+      const secondaryReflection = secondaryAhead * surfaceResponse.secondaryTrailGain * (0.38 + surfaceResponse.glitterWidth * 0.84);
       if (secondaryReflection > 0.03) {
         surfaceReflectionB.visible = true;
         surfaceReflectionB.position.copy(camera.position)
@@ -336,8 +340,12 @@ export function updateBinaryScene(ctx, frame) {
           .add(surfaceRight.clone().multiplyScalar(secondaryRight * 22));
         surfaceReflectionB.position.y = camera.position.y - 1.77;
         surfaceReflectionB.rotation.set(-Math.PI / 2, 0, -secondaryRight * 0.14);
-        surfaceReflectionB.scale.set(0.38, 0.3, 1);
-        surfaceReflectionB.material.opacity = 0.003 + secondaryReflection * 0.024;
+        surfaceReflectionB.scale.set(
+          0.34 + surfaceResponse.glitterWidth * 0.1,
+          0.25 + surfaceResponse.glitterWidth * 0.18,
+          1,
+        );
+        surfaceReflectionB.material.opacity = 0.0025 + secondaryReflection * 0.02;
       }
     }
 
