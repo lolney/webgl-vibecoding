@@ -59,7 +59,7 @@
     - [x] Better ocean BRDF and reflected-sky integration
     - [x] Stronger material separation and PBR response across stars, planets, water, tower surfaces, and emissives
   - [ ] New scenes
-    - [ ] Eclipse scene
+    - [x] Eclipse scene
     - [ ] Ice moon scene
     - [ ] Gas giant moonrise scene
   - [ ] Physical / astronomical phenomena
@@ -84,7 +84,7 @@
       - [ ] Then add eclipse/transit behavior because it exercises orbital geometry, atmospheric response, and presentation at once
       - [ ] Add aurora/weather only after the base sky/water/light transport is stable enough to absorb more volumetric complexity
     - [ ] Phase C: build new scenes from the improved primitives
-      - [ ] Start with the eclipse scene because it reuses the binary system and has the strongest visual payoff
+      - [x] Start with the eclipse scene because it reuses the binary system and has the strongest visual payoff
       - [ ] Follow with the gas giant moonrise scene to showcase large-scale lighting, atmospherics, and reflected light
       - [ ] Use the ice moon scene as the material/volumetric stress test once the BRDF stack is stronger
     - [ ] Phase D: authored presentation

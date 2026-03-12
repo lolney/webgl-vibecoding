@@ -4,6 +4,8 @@ import { computeLightingState, lightingDebugState } from "../shared/lighting.js"
 
 const EXTERNAL_BACKGROUND = new THREE.Color(0x02050d);
 const EXTERNAL_FOG_COLOR = new THREE.Color(0x071120);
+const ECLIPSE_BACKGROUND = new THREE.Color(0x01030a);
+const ECLIPSE_FOG_COLOR = new THREE.Color(0x050b18);
 
 export function updateBinaryScene(ctx, frame) {
   const {
@@ -70,6 +72,8 @@ export function updateBinaryScene(ctx, frame) {
 
   const isSurfaceScene = activeSceneKey === "binarySurface";
   const isExternalScene = activeSceneKey === "binaryExternal";
+  const isEclipseScene = activeSceneKey === "eclipseScene";
+  const isExternalFamily = isExternalScene || isEclipseScene;
 
   const orbit = computeBinarySimulationState({
     binaryDayHours,
@@ -146,7 +150,7 @@ export function updateBinaryScene(ctx, frame) {
   planetMesh.material.clearcoatRoughness = THREE.MathUtils.lerp(0.42, 0.18, transport.daylight * 0.68);
   planetMesh.material.emissive.copy(primary.apparentColor).multiplyScalar(reflectedLightFactor * 0.55)
     .add(secondary.apparentColor.clone().multiplyScalar(reflectedLightFactor * 0.85));
-  planetMesh.material.emissiveIntensity = isExternalScene
+  planetMesh.material.emissiveIntensity = isExternalFamily
     ? THREE.MathUtils.lerp(0.1, 0.46, orbit.combinedPhaseFraction)
     : THREE.MathUtils.lerp(0.03, 0.1, transport.twilight * 0.6 + secondary.visibleFactor * 0.18);
   cloudLayer.material.opacity = THREE.MathUtils.lerp(0.08, 0.18, transport.daylight * 0.74 + transport.twilight * 0.2);
@@ -161,7 +165,7 @@ export function updateBinaryScene(ctx, frame) {
   planetAtmosphere.material.uniforms.uLightStrengthA.value = THREE.MathUtils.lerp(0.18, 1.0, orbit.phaseFractionA);
   planetAtmosphere.material.uniforms.uLightStrengthB.value = THREE.MathUtils.lerp(0.12, 0.8, orbit.phaseFractionB);
   planetAtmosphere.material.uniforms.uNightReflectColor.value.copy(primary.apparentColor).lerp(secondary.apparentColor, 0.42);
-  planetAtmosphere.material.uniforms.uNightReflectStrength.value = isExternalScene
+  planetAtmosphere.material.uniforms.uNightReflectStrength.value = isExternalFamily
     ? reflectedLightFactor
     : reflectedLightFactor * 0.32;
 
@@ -183,9 +187,19 @@ export function updateBinaryScene(ctx, frame) {
     renderer.toneMappingExposure = 0.86;
     stars.material.opacity = 0.95;
     stars.material.size = 0.11;
+  } else if (isEclipseScene) {
+    const eclipseDarkening = THREE.MathUtils.lerp(0.0, 0.88, orbit.secondaryOcclusionFraction);
+    binaryAmbient.intensity = 0.0;
+    binaryAmbient.color.setRGB(0.0, 0.0, 0.0);
+    scene.background.copy(ECLIPSE_BACKGROUND).lerp(EXTERNAL_BACKGROUND, 1 - eclipseDarkening * 0.22);
+    scene.fog.color.copy(ECLIPSE_FOG_COLOR).lerp(EXTERNAL_FOG_COLOR, 1 - eclipseDarkening * 0.3);
+    scene.fog.density = 0.009 + eclipseDarkening * 0.004;
+    renderer.toneMappingExposure = THREE.MathUtils.lerp(0.84, 0.68, eclipseDarkening);
+    stars.material.opacity = THREE.MathUtils.lerp(0.92, 0.99, eclipseDarkening);
+    stars.material.size = THREE.MathUtils.lerp(0.12, 0.2, eclipseDarkening);
   }
 
-  if (isExternalScene) {
+  if (isExternalFamily) {
     binaryStarALight.intensity = 8600 * primaryVisibleFraction;
     binaryStarBLight.intensity = 6400 * secondaryVisibleFraction;
     binaryFill.intensity = 0.0;
@@ -201,8 +215,8 @@ export function updateBinaryScene(ctx, frame) {
   surfaceScatterBand.visible = false;
 
   if (timeIndicator) {
-    if (isExternalScene) {
-      timeIndicator.textContent = "System View";
+    if (isExternalFamily) {
+      timeIndicator.textContent = isEclipseScene ? "Eclipse View" : "System View";
     } else {
       const phaseText = Math.max(primary.altitudeDeg, secondary.altitudeDeg) > 0.0 ? "Day" : "Night";
       timeIndicator.textContent = `Time ${format24Hour(binaryDayHours)} ${phaseText}`;
@@ -224,6 +238,17 @@ export function updateBinaryScene(ctx, frame) {
         Math.cos(t * 0.07) * 0.8,
       ),
       cinematicMix * 0.06,
+    );
+  } else if (isEclipseScene) {
+    const eclipseFocus = starAGroup.position.clone().lerp(starBGroup.position, 0.54);
+    const eclipseBeat = THREE.MathUtils.smoothstep(orbit.secondaryOcclusionFraction, 0.2, 0.98);
+    controls.target.lerp(
+      eclipseFocus.clone().add(new THREE.Vector3(
+        Math.sin(t * 0.11) * THREE.MathUtils.lerp(0.24, 0.06, eclipseBeat),
+        Math.cos(t * 0.09) * THREE.MathUtils.lerp(0.08, 0.02, eclipseBeat),
+        Math.sin(t * 0.07) * THREE.MathUtils.lerp(0.12, 0.03, eclipseBeat),
+      )),
+      0.03 + cinematicMix * 0.06,
     );
   } else {
     if (camera.position.y < 1.0) camera.position.y = 1.0;

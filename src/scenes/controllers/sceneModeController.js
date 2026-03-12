@@ -33,10 +33,10 @@ export function applySceneModeInternal(params) {
   sceneManager.setActive(activeSceneKey);
   const activeSceneDef = sceneByKey[activeSceneKey] || clocktowerScene;
   const isClocktower = activeSceneKey === "clocktower";
+  const isExternalFamily = activeSceneKey === "binaryExternal" || activeSceneKey === "eclipseScene";
 
   for (const obj of clocktowerObjects) obj.visible = isClocktower;
-  const isBinaryExternal = activeSceneKey === "binaryExternal";
-  for (const obj of binaryObjects) obj.visible = isBinaryExternal;
+  for (const obj of binaryObjects) obj.visible = isExternalFamily;
   surfacePovGroup.visible = activeSceneKey === "binarySurface";
   surfaceForeground.visible = false;
   const preset = activeSceneDef.controls || clocktowerScene.controls;
@@ -72,13 +72,13 @@ export function applySceneModeInternal(params) {
     cloudLayer.visible = true;
     if (timeIndicator) timeIndicator.textContent = activeSceneDef.timeBadge || "Time --:--";
     hud.setScene("clocktower");
-  } else if (activeSceneKey === "binaryExternal") {
+  } else if (isExternalFamily) {
     camera.up.set(0, 1, 0);
     controls.target.set(0, 0, 0);
     camera.position.set(26.0, 11.0, 24.0);
     planetMesh.visible = true;
     cloudLayer.visible = true;
-    hud.setScene("binaryExternal");
+    hud.setScene(activeSceneKey);
   } else {
     controls.target.set(0, 4.15, -53.92);
     planetMesh.visible = false;

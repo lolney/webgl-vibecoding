@@ -12,6 +12,7 @@ import cityModuleAssetUrl from "./assets/city_module_asset.glb?url";
 import { clocktowerScene } from "./scenes/clocktowerScene.js";
 import { binaryExternalScene } from "./scenes/binaryExternalScene.js";
 import { binarySurfaceScene } from "./scenes/binarySurfaceScene.js";
+import { eclipseScene } from "./scenes/eclipseScene.js";
 import { createSceneManager } from "./scenes/sceneManager.js";
 import { createHudPrimitive } from "./ui/hudPrimitive.js";
 import { createDiagnosticsPanel } from "./ui/diagnosticsPanel.js";
@@ -1691,7 +1692,7 @@ Promise.all([loadGLTF(towerAssetUrl), loadGLTF(cityModuleAssetUrl)])
   });
 
 let activeSceneKey = "clocktower";
-const sceneDefinitions = [clocktowerScene, binaryExternalScene, binarySurfaceScene];
+const sceneDefinitions = [clocktowerScene, binaryExternalScene, binarySurfaceScene, eclipseScene];
 const sceneManager = createSceneManager({ sceneDefs: sceneDefinitions });
 const sceneByKey = Object.fromEntries(sceneDefinitions.map((sceneDef) => [sceneDef.key, sceneDef]));
 const sceneLabels = Object.fromEntries(sceneDefinitions.map((sceneDef) => [sceneDef.key, sceneDef.label]));
@@ -2004,6 +2005,12 @@ function applySceneMode(nextSceneKey, options = {}) {
     const orbit = getSurfaceObserverState();
     aimSurfaceForwardAtPrimary(orbit, -0.03);
     updateSurfaceCamera(0);
+  } else {
+    const activeSceneDef = sceneByKey[activeSceneKey];
+    const scenePresets = getPresetsForScene(activeSceneKey);
+    if (!activePresetKey && activeSceneDef?.defaultPreset && scenePresets.some((preset) => preset.key === activeSceneDef.defaultPreset)) {
+      applyBinaryPreset(activeSceneDef.defaultPreset, { syncUrl: false });
+    }
   }
   onResize();
   setCinematic(cinematic);
@@ -2256,6 +2263,10 @@ function setCinematic(on) {
   }
   if (activeSceneKey === "binaryExternal") {
     modeBadge.textContent = on ? "Cinematic Orbit // System View" : "Free Orbit // System View";
+    return;
+  }
+  if (activeSceneKey === "eclipseScene") {
+    modeBadge.textContent = on ? "Cinematic Orbit // Eclipse View" : "Free Orbit // Eclipse View";
     return;
   }
   const camText = on ? "Cinematic Orbit" : "Free Orbit";
@@ -2532,7 +2543,7 @@ window.__setOrbitView = (view = {}) => {
   }
   return getCurrentOrbitView();
 };
-if (pendingInitialOrbitView && activeSceneKey === "binaryExternal") {
+if (pendingInitialOrbitView && (activeSceneKey === "binaryExternal" || activeSceneKey === "eclipseScene")) {
   window.__setOrbitView(pendingInitialOrbitView);
   pendingInitialOrbitView = null;
 }
