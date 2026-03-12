@@ -129,6 +129,18 @@ export const binaryPresets = [
     },
   },
   {
+    key: "external-crescent",
+    scene: "binaryExternal",
+    label: "External // Crescent",
+    state: {
+      binaryDayHours: 12.0,
+      simulationDays: 154.0,
+      multiplier: 1,
+      cinematic: false,
+      orbitView: { azimuth: 2.79, polar: 1.35, distance: 30, targetX: 0, targetY: 0, targetZ: 0 },
+    },
+  },
+  {
     key: "external-conjunction",
     scene: "binaryExternal",
     label: "External // Conjunction",

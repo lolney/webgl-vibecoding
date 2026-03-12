@@ -582,26 +582,55 @@ const planetAtmosphere = new THREE.Mesh(
       uColor: { value: new THREE.Color(0x7db7ff) },
       uPower: { value: 3.2 },
       uIntensity: { value: 0.48 },
+      uLightDirA: { value: new THREE.Vector3(1, 0, 0) },
+      uLightDirB: { value: new THREE.Vector3(-1, 0, 0) },
+      uLightColorA: { value: new THREE.Color(0xffe09a) },
+      uLightColorB: { value: new THREE.Color(0xa8c6ff) },
+      uLightStrengthA: { value: 0.0 },
+      uLightStrengthB: { value: 0.0 },
+      uNightReflectColor: { value: new THREE.Color(0x4f84c8) },
+      uNightReflectStrength: { value: 0.02 },
     },
     vertexShader: `
-      varying vec3 vNormal;
-      varying vec3 vView;
+      varying vec3 vNormalW;
+      varying vec3 vViewW;
       void main() {
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        vNormal = normalize(normalMatrix * normal);
-        vView = normalize(-mv.xyz);
-        gl_Position = projectionMatrix * mv;
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vNormalW = normalize(mat3(modelMatrix) * normal);
+        vViewW = normalize(cameraPosition - worldPos.xyz);
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
       }
     `,
     fragmentShader: `
       uniform vec3 uColor;
       uniform float uPower;
       uniform float uIntensity;
-      varying vec3 vNormal;
-      varying vec3 vView;
+      uniform vec3 uLightDirA;
+      uniform vec3 uLightDirB;
+      uniform vec3 uLightColorA;
+      uniform vec3 uLightColorB;
+      uniform float uLightStrengthA;
+      uniform float uLightStrengthB;
+      uniform vec3 uNightReflectColor;
+      uniform float uNightReflectStrength;
+      varying vec3 vNormalW;
+      varying vec3 vViewW;
       void main() {
-        float rim = pow(max(0.0, 1.0 - dot(normalize(vNormal), normalize(vView))), uPower);
-        gl_FragColor = vec4(uColor * rim * uIntensity, rim * 0.7);
+        vec3 n = normalize(vNormalW);
+        vec3 v = normalize(vViewW);
+        float rim = pow(max(0.0, 1.0 - dot(n, v)), uPower);
+        float sunA = max(dot(n, normalize(uLightDirA)), 0.0);
+        float sunB = max(dot(n, normalize(uLightDirB)), 0.0);
+        float lit = clamp(sunA * uLightStrengthA + sunB * uLightStrengthB, 0.0, 1.5);
+        vec3 direct = (
+          uLightColorA * sunA * uLightStrengthA +
+          uLightColorB * sunB * uLightStrengthB
+        ) * rim * (0.55 + lit * 0.65);
+        float shadowSide = pow(clamp(1.0 - lit, 0.0, 1.0), 1.4);
+        vec3 reflected = uNightReflectColor * (uNightReflectStrength * shadowSide * rim);
+        vec3 col = uColor * rim * uIntensity + direct + reflected;
+        float alpha = clamp(rim * (0.4 + lit * 0.25 + uNightReflectStrength * 0.8), 0.0, 0.82);
+        gl_FragColor = vec4(col, alpha);
       }
     `,
   }),
@@ -2734,6 +2763,9 @@ function tick() {
     sceneDebug.primaryDeclinationDeg !== undefined
       ? `season day ${sceneDebug.seasonDay.toFixed(1)} decl A ${sceneDebug.primaryDeclinationDeg.toFixed(1)} B ${sceneDebug.secondaryDeclinationDeg.toFixed(1)}`
       : "season day --.- decl A --.- B --.-",
+    sceneDebug.combinedPhaseFraction !== undefined
+      ? `phase A ${sceneDebug.primaryPhaseFraction.toFixed(2)} B ${sceneDebug.secondaryPhaseFraction.toFixed(2)} combined ${sceneDebug.combinedPhaseFraction.toFixed(2)} refl ${sceneDebug.reflectedLightFactor.toFixed(2)}`
+      : "phase A --.-- B --.-- combined --.-- refl --.--",
     sceneDebug.lighting
       ? `airmass A ${sceneDebug.lighting.primaryAirMass.toFixed(2)} B ${sceneDebug.lighting.secondaryAirMass.toFixed(2)}`
       : "airmass A --.-- B --.--",

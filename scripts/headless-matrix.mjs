@@ -9,6 +9,7 @@ const cases = [
   ["--scene=clocktower", "--section=1", "--beat=0.45", "--level=0.55", "--name=matrix-clocktower-hyper-lift"],
   ["--scene=clocktower", "--section=3", "--beat=0.92", "--level=0.88", "--name=matrix-clocktower-strobe-core"],
   ["--scene=binaryExternal", "--preset=external-wide", "--name=matrix-external-wide"],
+  ["--scene=binaryExternal", "--preset=external-crescent", "--name=matrix-external-crescent"],
   ["--scene=binaryExternal", "--preset=external-conjunction", "--name=matrix-external-conjunction"],
   ["--scene=binarySurface", "--preset=surface-sunrise", "--name=matrix-surface-sunrise"],
   ["--scene=binarySurface", "--preset=surface-noon", "--name=matrix-surface-noon"],

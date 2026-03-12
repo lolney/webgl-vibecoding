@@ -65,7 +65,7 @@
   - [ ] Physical / astronomical phenomena
     - [ ] Eclipses and transits
     - [x] Seasonal axial-tilt behavior and solstice/equinox presets
-    - [ ] Planetary phases and reflected light
+    - [x] Planetary phases and reflected light
     - [ ] Tidal / orbital resonance cues
     - [ ] Aurora / upper-atmosphere glow
     - [ ] Weather volumes

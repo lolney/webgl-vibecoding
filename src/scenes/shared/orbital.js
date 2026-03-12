@@ -59,6 +59,10 @@ function declinationFromDirection(direction, spinAxis) {
   return Math.asin(THREE.MathUtils.clamp(direction.dot(spinAxis), -1, 1));
 }
 
+function phaseFractionFromDirections(lightDir, viewDir) {
+  return THREE.MathUtils.clamp((1 + lightDir.dot(viewDir)) * 0.5, 0, 1);
+}
+
 export function computeBinarySimulationState({
   binaryDayHours,
   simulationDays = null,
@@ -156,6 +160,18 @@ export function computeBinarySimulationState({
   // Weight by inverse-square falloff and star "intrinsic" brightness.
   const weightA = STAR_A_LUMINOSITY / (distA * distA);
   const weightB = STAR_B_LUMINOSITY / (distB * distB);
+  const cameraFromPlanet = cameraPosition instanceof THREE.Vector3
+    ? cameraPosition.clone().sub(planetPosition)
+    : new THREE.Vector3(0, 0, 1);
+  if (cameraFromPlanet.lengthSq() < 1e-8) cameraFromPlanet.set(0, 0, 1);
+  cameraFromPlanet.normalize();
+  const phaseFractionA = phaseFractionFromDirections(toA, cameraFromPlanet);
+  const phaseFractionB = phaseFractionFromDirections(toB, cameraFromPlanet);
+  const combinedPhaseFraction = THREE.MathUtils.clamp(
+    ((phaseFractionA * weightA) + (phaseFractionB * weightB)) / Math.max(1e-6, weightA + weightB),
+    0,
+    1,
+  );
   const combinedStarWorld = toA.clone().multiplyScalar(weightA).add(toB.clone().multiplyScalar(weightB)).normalize();
   const combinedStarTangent = projectToTangent(combinedStarWorld, observerNormal);
   const combinedStarDirWorld = toXZUnit(combinedStarWorld);
@@ -237,6 +253,10 @@ export function computeBinarySimulationState({
     primaryDir,
     secondaryDir,
     combinedStarWorld,
+    cameraFromPlanet,
+    phaseFractionA,
+    phaseFractionB,
+    combinedPhaseFraction,
     primaryLocalDir,
     secondaryLocalDir,
     siteDirWorld,

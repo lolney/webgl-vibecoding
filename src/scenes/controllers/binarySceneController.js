@@ -124,18 +124,36 @@ export function updateBinaryScene(ctx, frame) {
   planetPivot.position.copy(orbit.planetPosition);
   planetGroup.rotation.y = orbit.spinYaw;
   cloudLayer.rotation.y = -t * 0.17;
+  const reflectedLightFactor = THREE.MathUtils.clamp(
+    orbit.phaseFractionA * 0.18 + orbit.phaseFractionB * 0.12,
+    0,
+    0.22,
+  );
   planetMesh.material.color.copy(new THREE.Color(0x254b72)).lerp(new THREE.Color(0x4f83b8), transport.daylight * 0.62 + transport.twilight * 0.18);
   planetMesh.material.roughness = THREE.MathUtils.lerp(0.8, 0.46, transport.daylight * 0.72 + transport.twilight * 0.18);
   planetMesh.material.metalness = THREE.MathUtils.lerp(0.03, 0.1, transport.daylight * 0.3);
   planetMesh.material.clearcoat = THREE.MathUtils.lerp(0.08, 0.22, transport.daylight * 0.7 + secondary.visibleFactor * 0.12);
   planetMesh.material.clearcoatRoughness = THREE.MathUtils.lerp(0.42, 0.18, transport.daylight * 0.68);
-  planetMesh.material.emissive.setRGB(0, 0, 0).lerp(new THREE.Color(secondary.apparentColor), secondary.directIlluminanceLux > 0 ? 0.02 : 0.005);
-  planetMesh.material.emissiveIntensity = THREE.MathUtils.lerp(0.02, 0.08, transport.twilight * 0.6 + secondary.visibleFactor * 0.18);
+  planetMesh.material.emissive.copy(primary.apparentColor).multiplyScalar(reflectedLightFactor * 0.55)
+    .add(secondary.apparentColor.clone().multiplyScalar(reflectedLightFactor * 0.85));
+  planetMesh.material.emissiveIntensity = isExternalScene
+    ? THREE.MathUtils.lerp(0.1, 0.46, orbit.combinedPhaseFraction)
+    : THREE.MathUtils.lerp(0.03, 0.1, transport.twilight * 0.6 + secondary.visibleFactor * 0.18);
   cloudLayer.material.opacity = THREE.MathUtils.lerp(0.08, 0.18, transport.daylight * 0.74 + transport.twilight * 0.2);
   cloudLayer.material.color.copy(new THREE.Color(0xb8d7ff)).lerp(new THREE.Color(0xe9f3ff), transport.daylight * 0.34);
   cloudLayer.material.roughness = THREE.MathUtils.lerp(0.92, 0.62, transport.daylight * 0.7);
   cloudLayer.material.metalness = 0.0;
   planetAtmosphere.material.uniforms.uColor.value.copy(skyResponse.horizonColor).lerp(skyResponse.zenithColor, 0.28);
+  planetAtmosphere.material.uniforms.uLightDirA.value.copy(orbit.primaryDir);
+  planetAtmosphere.material.uniforms.uLightDirB.value.copy(orbit.secondaryDir);
+  planetAtmosphere.material.uniforms.uLightColorA.value.copy(primary.apparentColor);
+  planetAtmosphere.material.uniforms.uLightColorB.value.copy(secondary.apparentColor);
+  planetAtmosphere.material.uniforms.uLightStrengthA.value = THREE.MathUtils.lerp(0.18, 1.0, orbit.phaseFractionA);
+  planetAtmosphere.material.uniforms.uLightStrengthB.value = THREE.MathUtils.lerp(0.12, 0.8, orbit.phaseFractionB);
+  planetAtmosphere.material.uniforms.uNightReflectColor.value.copy(primary.apparentColor).lerp(secondary.apparentColor, 0.42);
+  planetAtmosphere.material.uniforms.uNightReflectStrength.value = isExternalScene
+    ? reflectedLightFactor
+    : reflectedLightFactor * 0.32;
 
   if (isSurfaceScene) {
     binaryAmbient.intensity = illumination.ambientLux;
@@ -457,6 +475,10 @@ export function updateBinaryScene(ctx, frame) {
     secondaryAltitudeDeg: secondary.altitudeDeg,
     primaryDeclinationDeg: THREE.MathUtils.radToDeg(orbit.primaryDeclination),
     secondaryDeclinationDeg: THREE.MathUtils.radToDeg(orbit.secondaryDeclination),
+    primaryPhaseFraction: orbit.phaseFractionA,
+    secondaryPhaseFraction: orbit.phaseFractionB,
+    combinedPhaseFraction: orbit.combinedPhaseFraction,
+    reflectedLightFactor,
     primaryAzimuthDeg: primary.azimuthDeg,
     secondaryAzimuthDeg: secondary.azimuthDeg,
     schematic: {
