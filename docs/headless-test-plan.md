@@ -127,6 +127,16 @@ Validate critical behaviors for:
   - the viewer heading remains stable relative to the local horizon
   - a small main-canvas drag changes viewer heading smoothly instead of jumping
 
+14. UI flow, URL restoration, and mobile layout remain stable
+- Command:
+  - `npm run headless:ui`
+- Expected:
+  - scene switching updates which controls are visible for each scene
+  - audio button starts successfully
+  - deep links preserve scene, preset, lat/lon, multiplier, and cinematic state across reload
+  - `binaryExternal` background/fog remain invariant to time-of-day route changes
+  - portrait mobile captures keep HUD and schematics inside the viewport with no schematic overlap
+
 ## Results
 
 1. Clocktower hides time badge: `PASS`
@@ -209,3 +219,11 @@ Validate critical behaviors for:
   - viewer heading remains stable: `viewerTurnYaw=1.6472084003121636` before and after latitude drag
   - pole normalization maps `lat=120, lon=-25` to `lat=60, lon=155`
   - a small main-canvas yaw drag changes `viewerTurnYaw` smoothly from `1.6472` to `1.5016`
+
+14. UI flow, URL restoration, and mobile layout: `PASS`
+- Evidence (`npm run headless:ui`, `output/mobile-*.png`):
+  - clocktower hides preset/time/rate controls while external and surface show the relevant subsets
+  - audio button toggles from `Start Audio` to `Stop Audio`
+  - deep-linked `binarySurface` sunset route preserves `lat=24`, `lon=30`, `timeMultiplier=8`, and `cinematic=true` across reload
+  - external background/fog stay invariant across route changes in hour
+  - mobile captures keep HUD and schematics within the viewport and keep the two schematics separated

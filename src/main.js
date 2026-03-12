@@ -1871,6 +1871,8 @@ function applySceneMode(nextSceneKey, options = {}) {
     aimSurfaceForwardAtPrimary(orbit, -0.03);
     updateSurfaceCamera(0);
   }
+  onResize();
+  setCinematic(cinematic);
   controls.enabled = activeSceneKey !== "binarySurface";
   orbitSchematic.setVisible(activeSceneKey === "binarySurface");
   viewerSchematic.setVisible(activeSceneKey === "binarySurface");
@@ -2421,6 +2423,14 @@ function displaceWaterGeometry(geometry, basePositions, time, amp = 1.0) {
 function onResize() {
   const w = window.innerWidth;
   const h = window.innerHeight;
+  const portrait = h > w;
+  if (portrait && activeSceneKey === "clocktower") {
+    camera.fov = 62;
+  } else if (portrait && activeSceneKey !== "clocktower") {
+    camera.fov = 56;
+  } else {
+    camera.fov = 52;
+  }
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);

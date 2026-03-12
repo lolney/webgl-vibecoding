@@ -40,4 +40,37 @@
   - Time should continue progressing smoothly (assume that it represents UTC; time zone independent)
   - The viewer vector should be correctly updated in all schematics. 
   - The viewer should maintain the same orientation relative to the horizon.
-- [x] Add latitude labels (0, 30N/S, 60N/S, 90N/S) on the globe. 
+- [x] Add latitude labels (0, 30N/S, 60N/S, 90N/S) on the globe.
+
+- [x] Test phase plan:
+  - [x] Run a scene-by-scene review of `clocktower`, `binaryExternal`, and `binarySurface` for bugs, inconsistencies, and presentation issues
+  - [x] Build a deterministic bug list with reproduction steps, expected behavior, and headless coverage status
+  - [x] Expand headless regression coverage for camera sweeps, viewport sizes, URL round-trips, scene-switching, and audio startup smoke cases
+  - [x] Perform desktop and mobile manual acceptance review for all scenes and controls
+  - [x] Resolve critical correctness bugs first, then rendering defects, then UI/presentation polish
+  - [x] Define and check test-phase sign-off criteria before closing the phase
+  - [x] See `docs/test-phase-plan.md` for detailed scope and workflow
+  - [x] Findings captured in `docs/test-phase-findings.md`
+
+- [ ] Next-level backlog:
+  - [ ] Rendering realism upgrades
+    - [ ] Multi-order atmospheric scattering approximation
+    - [ ] True volumetric participating media for stars, moonlight, and clocktower beams
+    - [ ] Better ocean BRDF and reflected-sky integration
+    - [ ] Stronger material separation and PBR response across stars, planets, water, tower surfaces, and emissives
+  - [ ] New scenes
+    - [ ] Eclipse scene
+    - [ ] Ice moon scene
+    - [ ] Gas giant moonrise scene
+  - [ ] Physical / astronomical phenomena
+    - [ ] Eclipses and transits
+    - [ ] Seasonal axial-tilt behavior and solstice/equinox presets
+    - [ ] Planetary phases and reflected light
+    - [ ] Tidal / orbital resonance cues
+    - [ ] Aurora / upper-atmosphere glow
+    - [ ] Weather volumes
+  - [ ] Presentation / demoscene escalation
+    - [ ] Authored scene progression
+    - [ ] Timeline-driven camera direction
+    - [ ] Restrained audio-reactive modulation of physically-based effects
+    - [ ] Capture / showcase tooling for scripted hero renders and clips

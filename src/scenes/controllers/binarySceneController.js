@@ -2,6 +2,9 @@ import * as THREE from "three";
 import { computeBinarySimulationState } from "../shared/orbital.js";
 import { computeLightingState, lightingDebugState } from "../shared/lighting.js";
 
+const EXTERNAL_BACKGROUND = new THREE.Color(0x02050d);
+const EXTERNAL_FOG_COLOR = new THREE.Color(0x071120);
+
 export function updateBinaryScene(ctx, frame) {
   const {
     camera,
@@ -114,12 +117,12 @@ export function updateBinaryScene(ctx, frame) {
   } else if (isExternalScene) {
     binaryAmbient.intensity = 0.0;
     binaryAmbient.color.setRGB(0.0, 0.0, 0.0);
-    scene.background.copy(skyResponse.backgroundColor.clone().multiplyScalar(0.32));
-    scene.fog.color.copy(aerialPerspective.external.fogColor);
-    scene.fog.density = aerialPerspective.external.fogDensity;
+    scene.background.copy(EXTERNAL_BACKGROUND);
+    scene.fog.color.copy(EXTERNAL_FOG_COLOR);
+    scene.fog.density = 0.0085;
     renderer.toneMappingExposure = 0.86;
     stars.material.opacity = 0.95;
-    stars.material.size = 0.08;
+    stars.material.size = 0.11;
   }
 
   if (isExternalScene) {
@@ -428,5 +431,9 @@ export function updateBinaryScene(ctx, frame) {
       viewerLightDot: orbit.viewerLightDot,
     },
     lighting: lightingDebugState(lighting),
+    backgroundLuma: scene.background?.isColor
+      ? Number(scene.background.getHSL({ h: 0, s: 0, l: 0 }).l.toFixed(4))
+      : null,
+    fogDensity: Number(scene.fog?.density?.toFixed?.(4) || 0),
   };
 }

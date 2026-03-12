@@ -28,8 +28,8 @@ export const binaryPresets = [
       latitudeDeg: 28,
       longitudeDeg: 0,
       multiplier: 1,
-      cinematic: true,
-      surfacePitch: 0.98,
+      cinematic: false,
+      surfacePitch: 0.07,
     },
   },
   {
@@ -71,6 +71,7 @@ export const binaryPresets = [
       longitudeDeg: 0,
       multiplier: 1,
       cinematic: false,
+      surfacePitch: -0.03,
     },
   },
   {

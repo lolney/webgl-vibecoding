@@ -61,7 +61,13 @@ export function applySceneModeInternal(params) {
 
   if (isClocktower) {
     camera.up.set(0, 1, 0);
-    controls.target.set(0, 2.2, 0);
+    if (window.innerHeight > window.innerWidth) {
+      camera.position.set(0, 3.05, 27.5);
+      controls.target.set(0, 2.05, 0);
+    } else {
+      camera.position.set(0, 3.2, 18.0);
+      controls.target.set(0, 2.2, 0);
+    }
     planetMesh.visible = true;
     cloudLayer.visible = true;
     if (timeIndicator) timeIndicator.textContent = activeSceneDef.timeBadge || "Time --:--";
@@ -82,7 +88,6 @@ export function applySceneModeInternal(params) {
     hud.setScene("binarySurface");
   }
   controls.update();
-  setCinematic(false);
   if (syncUrl) syncSceneToUrl(activeSceneKey, { pushHistory });
   return activeSceneKey;
 }

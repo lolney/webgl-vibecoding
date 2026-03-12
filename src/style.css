@@ -218,3 +218,41 @@ body {
     width: min(280px, 56vw);
   }
 }
+
+@media (max-width: 600px) {
+  .hud {
+    left: 12px;
+    bottom: 12px;
+    max-width: calc(100vw - 24px);
+  }
+
+  .controls-row {
+    gap: 8px;
+  }
+
+  .orbit-schematic {
+    right: 12px;
+    top: 12px;
+    width: min(168px, 43vw);
+    height: min(176px, 21vh);
+  }
+
+  .viewer-schematic {
+    left: 12px;
+    top: 12px;
+    width: min(156px, 40vw);
+    height: min(198px, 24vh);
+  }
+
+  #viewerLatitude {
+    padding: 0 10px;
+    font-size: 10px;
+  }
+
+  .diagnostics-panel {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+  }
+}

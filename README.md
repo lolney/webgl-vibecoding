@@ -98,6 +98,22 @@ Runs the planet-POV latitude wheel regression, including real drag interaction o
 npm run headless:latitude
 ```
 
+## Headless UI / mobile regression
+
+Runs scene-switching, deep-link URL restoration, audio start, and portrait-mobile layout checks.
+
+```bash
+npm run headless:ui
+```
+
+## Full test-phase regression
+
+Runs the complete validation sweep used for test-phase sign-off.
+
+```bash
+npm run headless:test-phase
+```
+
 Examples:
 
 ```bash
