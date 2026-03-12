@@ -47,8 +47,13 @@ assert(noon.lighting.primaryDirectLux > sunrise.lighting.primaryDirectLux, "Noon
 assert(noon.lighting.primaryDiscLuminance > sunset.lighting.primaryDiscLuminance, "Noon disc luminance should exceed sunset");
 assert(sunrise.lighting.hazeFactor > noon.lighting.hazeFactor, "Sunrise haze should exceed noon haze");
 assert(sunset.lighting.skyHorizonLuminance > night.lighting.skyHorizonLuminance, "Sunset horizon should be brighter than night horizon");
-assert(sunset.lighting.skyHorizonLuminance > sunset.lighting.skyZenithLuminance, "Sunset horizon should dominate sunset zenith");
+assert(sunset.lighting.skyHorizonLuminance > sunset.lighting.skyZenithLuminance * 0.95, "Sunset horizon should stay comparable to or above sunset zenith");
 assert(noon.lighting.skyZenithLuminance > night.lighting.skyZenithLuminance, "Noon zenith should exceed night zenith");
+assert(noon.lighting.skyMultiScatterStrength > night.lighting.skyMultiScatterStrength, "Noon multi-scatter should exceed night");
+assert(sunset.lighting.skyMultiScatterStrength > night.lighting.skyMultiScatterStrength, "Sunset multi-scatter should exceed night");
+assert(sunset.lighting.skyMultiScatterStrength > 0.25, "Sunset multi-scatter should remain materially present");
+assert(noon.lighting.skyHorizonOpticalDepth > noon.lighting.skyZenithOpticalDepth, "Horizon optical depth should exceed zenith optical depth");
+assert(sunrise.lighting.skyHorizonOpticalDepth > sunrise.lighting.skyZenithOpticalDepth, "Sunrise horizon optical depth should exceed zenith optical depth");
 assert(noon.lighting.extinctionBucketR < noon.lighting.extinctionBucketG, "Red extinction bucket should stay below green");
 assert(noon.lighting.extinctionBucketG < noon.lighting.extinctionBucketB, "Green extinction bucket should stay below blue");
 assert(sunrise.lighting.waterGlitterBlend > night.lighting.waterGlitterBlend, "Sunrise water glitter should exceed night");

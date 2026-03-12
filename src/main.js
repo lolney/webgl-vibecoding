@@ -584,12 +584,16 @@ const surfaceSky = new THREE.Mesh(
       uRayleighColor: { value: new THREE.Color(0x77b6ff) },
       uMieColorA: { value: new THREE.Color(0xffc07a) },
       uMieColorB: { value: new THREE.Color(0xa9c8ff) },
+      uMultiScatterColor: { value: new THREE.Color(0xa5c3ff) },
       uSunDirA: { value: new THREE.Vector3(0, 1, 0) },
       uSunDirB: { value: new THREE.Vector3(0, 1, 0) },
       uDayStrength: { value: 0.2 },
       uTwilightStrength: { value: 0.0 },
       uNightStrength: { value: 1.0 },
       uHaze: { value: 0.2 },
+      uMultiScatterStrength: { value: 0.1 },
+      uZenithOpticalDepth: { value: 0.46 },
+      uHorizonOpticalDepth: { value: 5.2 },
       uScatterStrengthA: { value: 0.0 },
       uScatterStrengthB: { value: 0.0 },
       uMieStrengthA: { value: 0.0 },
@@ -611,12 +615,16 @@ const surfaceSky = new THREE.Mesh(
       uniform vec3 uRayleighColor;
       uniform vec3 uMieColorA;
       uniform vec3 uMieColorB;
+      uniform vec3 uMultiScatterColor;
       uniform vec3 uSunDirA;
       uniform vec3 uSunDirB;
       uniform float uDayStrength;
       uniform float uTwilightStrength;
       uniform float uNightStrength;
       uniform float uHaze;
+      uniform float uMultiScatterStrength;
+      uniform float uZenithOpticalDepth;
+      uniform float uHorizonOpticalDepth;
       uniform float uScatterStrengthA;
       uniform float uScatterStrengthB;
       uniform float uMieStrengthA;
@@ -633,6 +641,9 @@ const surfaceSky = new THREE.Mesh(
         float miePhaseB = pow(muB, mix(12.0, 26.0, 1.0 - uHaze));
         float horizon = pow(1.0 - h, 1.4);
         float density = mix(1.05, 2.5, horizon) * mix(0.75, 1.45, uHaze);
+        float opticalDepth = mix(uHorizonOpticalDepth, uZenithOpticalDepth, pow(h, 0.72));
+        float multiScatterPhase = 1.0 - exp(-opticalDepth * (0.36 + uHaze * 0.22));
+        float forwardGlow = max(muA, muB);
 
         vec3 nightBase = mix(uNightHorizon, uNightZenith, pow(h, 0.72));
         vec3 dayBase = mix(uHorizonColor, uZenithColor, pow(h, 0.7));
@@ -642,10 +653,15 @@ const surfaceSky = new THREE.Mesh(
         ) * density * (0.45 + 0.55 * h);
         vec3 mie = uMieColorA * miePhaseA * uMieStrengthA
           + uMieColorB * miePhaseB * uMieStrengthB;
+        vec3 multiScatter = uMultiScatterColor
+          * uMultiScatterStrength
+          * multiScatterPhase
+          * mix(1.1, 0.74, h)
+          * mix(0.88, 1.18, forwardGlow);
         vec3 twilightBoost = uHorizonColor * horizon * (uTwilightStrength * 0.46);
         float waterlineBand = smoothstep(0.0, 0.05, h) * (1.0 - smoothstep(0.05, 0.14, h));
 
-        vec3 litSky = dayBase + scatter + mie + twilightBoost;
+        vec3 litSky = dayBase + scatter + mie + multiScatter + twilightBoost;
         vec3 col = mix(nightBase, litSky, clamp(uDayStrength + uTwilightStrength * 0.72, 0.0, 1.0));
         col *= 1.0 - waterlineBand * 0.24;
         col = mix(col, nightBase, uNightStrength * smoothstep(0.0, 0.35, 1.0 - h) * 0.18);

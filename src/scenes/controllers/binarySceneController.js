@@ -355,12 +355,16 @@ export function updateBinaryScene(ctx, frame) {
     surfaceSky.material.uniforms.uRayleighColor.value.copy(skyResponse.rayleighColor);
     surfaceSky.material.uniforms.uMieColorA.value.copy(skyResponse.mieColorA);
     surfaceSky.material.uniforms.uMieColorB.value.copy(skyResponse.mieColorB);
+    surfaceSky.material.uniforms.uMultiScatterColor.value.copy(skyResponse.multiScatterColor);
     surfaceSky.material.uniforms.uSunDirA.value.copy(orbit.primaryLocalDir);
     surfaceSky.material.uniforms.uSunDirB.value.copy(orbit.secondaryLocalDir);
     surfaceSky.material.uniforms.uDayStrength.value = transport.daylight;
     surfaceSky.material.uniforms.uTwilightStrength.value = transport.twilight;
     surfaceSky.material.uniforms.uNightStrength.value = transport.night;
     surfaceSky.material.uniforms.uHaze.value = transport.haze;
+    surfaceSky.material.uniforms.uMultiScatterStrength.value = skyResponse.multiScatterStrength;
+    surfaceSky.material.uniforms.uZenithOpticalDepth.value = skyResponse.zenithOpticalDepth;
+    surfaceSky.material.uniforms.uHorizonOpticalDepth.value = skyResponse.horizonOpticalDepth;
     surfaceSky.material.uniforms.uScatterStrengthA.value = skyResponse.scatterStrengthA;
     surfaceSky.material.uniforms.uScatterStrengthB.value = skyResponse.scatterStrengthB;
     surfaceSky.material.uniforms.uMieStrengthA.value = skyResponse.mieStrengthA;

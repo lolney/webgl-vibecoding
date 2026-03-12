@@ -54,7 +54,7 @@
 
 - [ ] Next-level backlog:
   - [ ] Rendering realism upgrades
-    - [ ] Multi-order atmospheric scattering approximation
+    - [x] Multi-order atmospheric scattering approximation
     - [ ] True volumetric participating media for stars, moonlight, and clocktower beams
     - [ ] Better ocean BRDF and reflected-sky integration
     - [ ] Stronger material separation and PBR response across stars, planets, water, tower surfaces, and emissives
@@ -76,7 +76,7 @@
     - [ ] Capture / showcase tooling for scripted hero renders and clips
   - [ ] Execution plan
     - [ ] Phase A: rendering foundation
-      - [ ] Upgrade the atmospheric model first so later scenes and phenomena share one sky/air transport model
+      - [x] Upgrade the atmospheric model first so later scenes and phenomena share one sky/air transport model
       - [ ] Follow with ocean/material BRDF work so reflections and surfaces respond coherently to the new lighting
       - [ ] Keep regression coverage expanding in parallel with each rendering change
     - [ ] Phase B: showcase physical phenomena on top of the improved renderer

@@ -8,6 +8,8 @@ const NIGHT_HORIZON = new THREE.Color(0x081428);
 const RAYLEIGH_COEFF = new THREE.Color(0.33, 0.56, 1.0);
 const MIE_COEFF = new THREE.Color(1.0, 0.91, 0.76);
 const AIR_GLOW_COEFF = new THREE.Color(0.14, 0.2, 0.32);
+const MULTI_SCATTER_COEFF = new THREE.Color(0.5, 0.62, 0.94);
+const HORIZON_GLOW_COEFF = new THREE.Color(1.0, 0.76, 0.48);
 const EXTINCTION_WAVELENGTHS_NM = { r: 680, g: 550, b: 440 };
 const RAYLEIGH_EXTINCTION_SCALE = 0.028;
 const AEROSOL_EXTINCTION_SCALE = 0.008;
@@ -69,6 +71,13 @@ function apparentSolarColor(baseColor, transmittance) {
   return color.multiplyScalar(1 / peak);
 }
 
+function opticalDepthForView(viewUp, haze) {
+  const mu = THREE.MathUtils.clamp(viewUp, 0.02, 1.0);
+  const rayleighDepth = 1 / (mu + 0.12);
+  const aerosolDepth = 1 / (mu + 0.055);
+  return rayleighDepth * (0.4 + haze * 0.08) + aerosolDepth * (0.12 + haze * 0.36);
+}
+
 function scaleColor(color, scalar) {
   return color.clone().multiplyScalar(scalar);
 }
@@ -116,20 +125,70 @@ function computeSkyResponse({ daylight, twilight, haze, horizonWarmth, primary, 
     .multiplyScalar(secondary.mieFactor * (0.48 + secondary.horizonFactor * 0.36));
   const mieRadiance = primaryMieRadiance.clone().add(secondaryMieRadiance);
 
-  const zenithRadiance = scaleColor(rayleighRadiance, 0.82 + daylight * 0.28)
-    .add(scaleColor(mieRadiance, 0.08 + haze * 0.04))
-    .add(scaleColor(AIR_GLOW_COEFF, daylight * 0.06));
+  const zenithOpticalDepth = opticalDepthForView(1.0, haze);
+  const horizonOpticalDepth = opticalDepthForView(0.02, haze);
+  const transportWeightedSource = primary.apparentColor.clone()
+    .multiplyScalar(primary.visibleFactor * (0.2 + primary.transmittanceLuma * 0.8))
+    .add(
+      secondary.apparentColor.clone()
+        .multiplyScalar(secondary.visibleFactor * (0.14 + secondary.transmittanceLuma * 0.62)),
+    );
+  const multiScatterColor = chromaOrFallback(
+    multiplyColor(rayleighRadiance, MULTI_SCATTER_COEFF)
+      .add(scaleColor(mieRadiance, 0.32))
+      .add(scaleColor(transportWeightedSource, 0.18)),
+    rayleighRadiance,
+  );
+  const multiScatterStrength = clamp01(
+    0.03
+      + daylight * 0.42
+      + twilight * 0.2
+      + haze * 0.1
+      + luma(rayleighRadiance) * 0.1,
+  );
+  const zenithMultiScatter = scaleColor(
+    multiScatterColor,
+    multiScatterStrength * (0.22 + daylight * 0.08 + zenithOpticalDepth * 0.02),
+  );
+  const horizonMultiScatter = scaleColor(
+    multiScatterColor.clone().lerp(HORIZON_GLOW_COEFF, horizonWarmth * 0.38),
+    multiScatterStrength * (0.24 + horizonOpticalDepth * 0.016),
+  );
+  const lowerAtmosphereAbsorption = new THREE.Color(
+    Math.exp(-0.11 * horizonOpticalDepth),
+    Math.exp(-0.07 * horizonOpticalDepth),
+    Math.exp(-0.035 * horizonOpticalDepth),
+  );
+  const highAtmosphereAbsorption = new THREE.Color(
+    Math.exp(-0.045 * zenithOpticalDepth),
+    Math.exp(-0.03 * zenithOpticalDepth),
+    Math.exp(-0.018 * zenithOpticalDepth),
+  );
+
+  const zenithRadiance = scaleColor(rayleighRadiance, 0.94 + daylight * 0.44)
+    .add(scaleColor(mieRadiance, 0.06 + haze * 0.03))
+    .add(zenithMultiScatter)
+    .add(scaleColor(AIR_GLOW_COEFF, daylight * 0.1));
   const horizonRadiance = scaleColor(rayleighRadiance, 0.34 + twilight * 0.18)
     .add(scaleColor(mieRadiance, 0.58 + haze * 0.28))
+    .add(horizonMultiScatter)
     .add(scaleColor(primary.apparentColor, primary.horizonFactor * 0.08))
     .add(scaleColor(secondary.apparentColor, secondary.horizonFactor * 0.05));
 
   const zenithColor = clampColor(
-    compressColor(NIGHT_ZENITH.clone().add(zenithRadiance), 1.02),
+    compressColor(
+      NIGHT_ZENITH.clone()
+        .add(multiplyColor(zenithRadiance, highAtmosphereAbsorption)),
+      1.06,
+    ),
     1.0,
   );
   const horizonColor = clampColor(
-    compressColor(NIGHT_HORIZON.clone().add(horizonRadiance), 0.96),
+    compressColor(
+      NIGHT_HORIZON.clone()
+        .add(multiplyColor(horizonRadiance, lowerAtmosphereAbsorption)),
+      1.02,
+    ),
     0.94,
   );
   const ambientColor = NIGHT_HORIZON.clone()
@@ -149,12 +208,16 @@ function computeSkyResponse({ daylight, twilight, haze, horizonWarmth, primary, 
     rayleighColor: chromaOrFallback(rayleighRadiance, RAYLEIGH_COEFF),
     mieColorA: chromaOrFallback(primaryMieRadiance, primary.apparentColor),
     mieColorB: chromaOrFallback(secondaryMieRadiance, secondary.apparentColor),
+    multiScatterColor,
+    multiScatterStrength,
     scatterStrengthA: primary.scatterFactor,
     scatterStrengthB: secondary.scatterFactor * 0.7,
     mieStrengthA: primary.mieFactor,
     mieStrengthB: secondary.mieFactor * 0.85,
     fogDensity: THREE.MathUtils.lerp(0.098, 0.032, daylight),
     horizonWarmth,
+    zenithOpticalDepth,
+    horizonOpticalDepth,
   };
 }
 
@@ -448,10 +511,14 @@ export function computeLightingState(orbit) {
       rayleighColor: skyResponse.rayleighColor,
       mieColorA: skyResponse.mieColorA,
       mieColorB: skyResponse.mieColorB,
+      multiScatterColor: skyResponse.multiScatterColor,
+      multiScatterStrength: skyResponse.multiScatterStrength,
       scatterStrengthA: skyResponse.scatterStrengthA,
       scatterStrengthB: skyResponse.scatterStrengthB,
       mieStrengthA: skyResponse.mieStrengthA,
       mieStrengthB: skyResponse.mieStrengthB,
+      zenithOpticalDepth: skyResponse.zenithOpticalDepth,
+      horizonOpticalDepth: skyResponse.horizonOpticalDepth,
       ambientColor: skyResponse.ambientColor,
       fogColor: skyResponse.fogColor,
       backgroundColor: skyResponse.backgroundColor,
@@ -498,6 +565,9 @@ export function lightingDebugState(lighting) {
     extinctionBucketB: Number(ATMOSPHERIC_EXTINCTION.b.toFixed(4)),
     skyZenithLuminance: Number(lighting.skyResponse.zenithLuminance.toFixed(4)),
     skyHorizonLuminance: Number(lighting.skyResponse.horizonLuminance.toFixed(4)),
+    skyMultiScatterStrength: Number(lighting.skyResponse.multiScatterStrength.toFixed(4)),
+    skyZenithOpticalDepth: Number(lighting.skyResponse.zenithOpticalDepth.toFixed(4)),
+    skyHorizonOpticalDepth: Number(lighting.skyResponse.horizonOpticalDepth.toFixed(4)),
     primaryDiscLuminance: Number(lighting.sourceUnits.primaryDiscLuminance.toFixed(3)),
     secondaryDiscLuminance: Number(lighting.sourceUnits.secondaryDiscLuminance.toFixed(3)),
     primaryHaloLuminance: Number(lighting.sourceUnits.primaryHaloLuminance.toFixed(3)),
