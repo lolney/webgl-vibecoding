@@ -20,8 +20,11 @@ export function updateBinaryScene(ctx, frame) {
     binaryStarALight,
     binaryStarBLight,
     planetAtmosphere,
+    planetMesh,
     starAGroup,
+    starAVisual,
     starBGroup,
+    starBVisual,
     planetPivot,
     planetGroup,
     cloudLayer,
@@ -101,9 +104,38 @@ export function updateBinaryScene(ctx, frame) {
   binaryStarALight.position.copy(starAGroup.position);
   binaryStarBLight.position.copy(starBGroup.position);
 
+  if (starAVisual?.core?.material?.uniforms) {
+    starAVisual.core.material.uniforms.uCore.value.copy(primary.apparentColor).lerp(new THREE.Color(0xfff9e5), 0.28);
+    starAVisual.core.material.uniforms.uGlow.value.copy(primary.apparentColor);
+    starAVisual.innerShell.material.uniforms.uColor.value.copy(primary.apparentColor);
+    starAVisual.innerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.16, 0.34, primary.horizonFactor + primary.visibleFactor * 0.18);
+    starAVisual.outerShell.material.uniforms.uColor.value.copy(primary.apparentColor).lerp(new THREE.Color(0xffd59a), 0.22);
+    starAVisual.outerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.08, 0.18, primary.horizonFactor + primary.visibleFactor * 0.12);
+  }
+  if (starBVisual?.core?.material?.uniforms) {
+    starBVisual.core.material.uniforms.uCore.value.copy(secondary.apparentColor).lerp(new THREE.Color(0xe7efff), 0.2);
+    starBVisual.core.material.uniforms.uGlow.value.copy(secondary.apparentColor);
+    starBVisual.innerShell.material.uniforms.uColor.value.copy(secondary.apparentColor);
+    starBVisual.innerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.12, 0.24, secondary.horizonFactor + secondary.visibleFactor * 0.14);
+    starBVisual.outerShell.material.uniforms.uColor.value.copy(secondary.apparentColor).lerp(new THREE.Color(0xb0c9ff), 0.18);
+    starBVisual.outerShell.material.uniforms.uAlpha.value = THREE.MathUtils.lerp(0.06, 0.13, secondary.horizonFactor + secondary.visibleFactor * 0.1);
+  }
+
   planetPivot.position.copy(orbit.planetPosition);
   planetGroup.rotation.y = orbit.spinYaw;
   cloudLayer.rotation.y = -t * 0.17;
+  planetMesh.material.color.copy(new THREE.Color(0x254b72)).lerp(new THREE.Color(0x4f83b8), transport.daylight * 0.62 + transport.twilight * 0.18);
+  planetMesh.material.roughness = THREE.MathUtils.lerp(0.8, 0.46, transport.daylight * 0.72 + transport.twilight * 0.18);
+  planetMesh.material.metalness = THREE.MathUtils.lerp(0.03, 0.1, transport.daylight * 0.3);
+  planetMesh.material.clearcoat = THREE.MathUtils.lerp(0.08, 0.22, transport.daylight * 0.7 + secondary.visibleFactor * 0.12);
+  planetMesh.material.clearcoatRoughness = THREE.MathUtils.lerp(0.42, 0.18, transport.daylight * 0.68);
+  planetMesh.material.emissive.setRGB(0, 0, 0).lerp(new THREE.Color(secondary.apparentColor), secondary.directIlluminanceLux > 0 ? 0.02 : 0.005);
+  planetMesh.material.emissiveIntensity = THREE.MathUtils.lerp(0.02, 0.08, transport.twilight * 0.6 + secondary.visibleFactor * 0.18);
+  cloudLayer.material.opacity = THREE.MathUtils.lerp(0.08, 0.18, transport.daylight * 0.74 + transport.twilight * 0.2);
+  cloudLayer.material.color.copy(new THREE.Color(0xb8d7ff)).lerp(new THREE.Color(0xe9f3ff), transport.daylight * 0.34);
+  cloudLayer.material.roughness = THREE.MathUtils.lerp(0.92, 0.62, transport.daylight * 0.7);
+  cloudLayer.material.metalness = 0.0;
+  planetAtmosphere.material.uniforms.uColor.value.copy(skyResponse.horizonColor).lerp(skyResponse.zenithColor, 0.28);
 
   if (isSurfaceScene) {
     binaryAmbient.intensity = illumination.ambientLux;

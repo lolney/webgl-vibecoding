@@ -1181,17 +1181,55 @@ moonReflectionWide.position.set(0, -0.381, shorelineZ - 23.0);
 moonReflectionWide.renderOrder = 69;
 scene.add(moonReflectionWide);
 
-function neonMat(color, emissive = 0.95, roughness = 0.3, extra = {}) {
+const towerGlowMaterials = [];
+
+function towerStructureMat(color, extra = {}) {
   return new THREE.MeshPhysicalMaterial({
+    color,
+    emissive: new THREE.Color(color).multiplyScalar(0.08),
+    emissiveIntensity: 0.16,
+    roughness: 0.58,
+    metalness: 0.12,
+    clearcoat: 0.34,
+    clearcoatRoughness: 0.28,
+    reflectivity: 0.54,
+    ior: 1.38,
+    ...extra,
+  });
+}
+
+function towerGlowMat(color, emissive = 0.95, roughness = 0.18, extra = {}) {
+  const material = new THREE.MeshPhysicalMaterial({
     color,
     emissive: new THREE.Color(color),
     emissiveIntensity: emissive,
     roughness,
-    metalness: 0.28,
-    clearcoat: 0.85,
-    clearcoatRoughness: 0.25,
-    reflectivity: 0.85,
-    ior: 1.45,
+    metalness: 0.18,
+    clearcoat: 0.92,
+    clearcoatRoughness: 0.16,
+    reflectivity: 0.92,
+    ior: 1.46,
+    ...extra,
+  });
+  towerGlowMaterials.push(material);
+  return material;
+}
+
+function towerGlassMat(color, emissiveColor, extra = {}) {
+  return new THREE.MeshPhysicalMaterial({
+    color,
+    emissive: new THREE.Color(emissiveColor).multiplyScalar(0.35),
+    emissiveIntensity: 0.24,
+    roughness: 0.08,
+    metalness: 0.02,
+    transmission: 0.62,
+    thickness: 0.72,
+    attenuationDistance: 2.8,
+    attenuationColor: new THREE.Color(color),
+    clearcoat: 0.92,
+    clearcoatRoughness: 0.08,
+    reflectivity: 0.86,
+    ior: 1.5,
     ...extra,
   });
 }
@@ -1199,16 +1237,25 @@ function neonMat(color, emissive = 0.95, roughness = 0.3, extra = {}) {
 const towerGroup = new THREE.Group();
 scene.add(towerGroup);
 
-const towerBase = new THREE.Mesh(new THREE.BoxGeometry(6.5, 1.9, 2.6), neonMat(0x2f96ff, 0.72, 0.35));
+const towerBase = new THREE.Mesh(new THREE.BoxGeometry(6.5, 1.9, 2.6), towerStructureMat(0x2f96ff, {
+  roughness: 0.52,
+  metalness: 0.08,
+}));
 towerBase.position.y = 0.55;
 towerGroup.add(towerBase);
 
-const towerStripe = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.2, 2.65), neonMat(0xff48f6, 1.8, 0.2));
+const towerStripe = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.2, 2.65), towerGlowMat(0xff48f6, 1.7, 0.14));
 towerStripe.position.set(0, 1.35, 0);
 towerGroup.add(towerStripe);
 
-const towerDetailMat = neonMat(0x7cc7ff, 0.9, 0.24, { metalness: 0.42, clearcoatRoughness: 0.14 });
-const towerAccentMat = neonMat(0xff7cf8, 1.5, 0.16, { metalness: 0.38 });
+const towerDetailMat = towerStructureMat(0x7cc7ff, {
+  emissiveIntensity: 0.12,
+  roughness: 0.44,
+  metalness: 0.16,
+  clearcoatRoughness: 0.18,
+});
+const towerAccentMat = towerGlowMat(0xff7cf8, 1.22, 0.1, { metalness: 0.14 });
+const towerWarmAccentMat = towerGlowMat(0xffd75a, 0.78, 0.18, { metalness: 0.08 });
 
 for (let i = -2; i <= 2; i += 1) {
   const x = i * 1.42;
@@ -1233,10 +1280,9 @@ for (let i = -2; i <= 2; i += 1) {
   const x = i * 1.32;
   const glass = new THREE.Mesh(
     new THREE.CylinderGeometry(0.56, 0.56, 0.16, 26, 1, false, 0, Math.PI),
-    neonMat(0xffd94e, 1.35, 0.14, {
-      transmission: 0.36,
-      thickness: 0.65,
-      attenuationDistance: 2.4,
+    towerGlassMat(0xffd94e, 0xffef9a, {
+      emissiveIntensity: 0.18,
+      attenuationDistance: 2.2,
       attenuationColor: new THREE.Color(0xffcc66),
     }),
   );
@@ -1246,18 +1292,22 @@ for (let i = -2; i <= 2; i += 1) {
 
   const frame = new THREE.Mesh(
     new THREE.TorusGeometry(0.58, 0.052, 16, 52, Math.PI),
-    neonMat(0xff4ef7, 1.7, 0.2),
+    towerGlowMat(0xff4ef7, 1.46, 0.12),
   );
   frame.rotation.x = Math.PI;
   frame.position.set(x, 0.35, 1.24);
   towerGroup.add(frame);
 
-  const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.7, 0.04), neonMat(0xffe46f, 0.8, 0.2));
+  const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.7, 0.04), towerWarmAccentMat);
   mullion.position.set(x, 0.26, 1.3);
   towerGroup.add(mullion);
 }
 
-const shaft = new THREE.Mesh(new THREE.BoxGeometry(1.42, 6.0, 1.42), neonMat(0x2cc4ff, 1.0, 0.28));
+const shaft = new THREE.Mesh(new THREE.BoxGeometry(1.42, 6.0, 1.42), towerStructureMat(0x2cc4ff, {
+  roughness: 0.38,
+  metalness: 0.1,
+  emissiveIntensity: 0.14,
+}));
 shaft.position.y = 3.66;
 towerGroup.add(shaft);
 
@@ -1271,34 +1321,44 @@ for (let i = 0; i < 4; i += 1) {
 
 for (let i = 0; i < 6; i += 1) {
   const y = 1.55 + i * 0.8;
-  const strip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.62, 0.06), neonMat(0xffd949, 1.4, 0.2));
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.62, 0.06), towerWarmAccentMat);
   strip.position.set(i % 2 === 0 ? -0.25 : 0.25, y, 0.72);
   towerGroup.add(strip);
 }
 
-const bellStage = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.9, 2.1), neonMat(0x2f84ff, 1.0, 0.2));
+const bellStage = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.9, 2.1), towerStructureMat(0x2f84ff, {
+  roughness: 0.34,
+  metalness: 0.12,
+  emissiveIntensity: 0.16,
+}));
 bellStage.position.y = 6.95;
 towerGroup.add(bellStage);
 
-const dome = new THREE.Mesh(new THREE.SphereGeometry(0.58, 24, 18), neonMat(0x84bcff, 1.05, 0.16));
+const dome = new THREE.Mesh(new THREE.SphereGeometry(0.58, 24, 18), towerStructureMat(0x84bcff, {
+  roughness: 0.24,
+  metalness: 0.18,
+  emissiveIntensity: 0.12,
+}));
 dome.scale.y = 0.68;
 dome.position.y = 7.62;
 towerGroup.add(dome);
 
-const spire = new THREE.Mesh(new THREE.ConeGeometry(0.095, 0.65, 12), neonMat(0xffffff, 2.1, 0.08));
+const spire = new THREE.Mesh(new THREE.ConeGeometry(0.095, 0.65, 12), towerGlowMat(0xffffff, 1.62, 0.06, {
+  metalness: 0.02,
+}));
 spire.position.y = 8.18;
 towerGroup.add(spire);
 
 const clockRingOuter = new THREE.Mesh(
   new THREE.TorusGeometry(0.42, 0.045, 18, 72),
-  neonMat(0xff86ff, 2.5, 0.14),
+  towerGlowMat(0xff86ff, 2.1, 0.08),
 );
 clockRingOuter.position.set(0, 4.35, 0.74);
 towerGroup.add(clockRingOuter);
 
 const clockRingInner = new THREE.Mesh(
   new THREE.TorusGeometry(0.325, 0.028, 18, 72),
-  neonMat(0x8ccfff, 1.7, 0.2),
+  towerGlowMat(0x8ccfff, 1.28, 0.12),
 );
 clockRingInner.position.set(0, 4.35, 0.742);
 towerGroup.add(clockRingInner);
@@ -1318,12 +1378,16 @@ for (let i = 0; i < 12; i += 1) {
   clockTickGroup.add(tick);
 }
 
-const minuteHand = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.31, 0.04), neonMat(0xffef74, 2.25, 0.12));
+const minuteHand = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.31, 0.04), towerGlowMat(0xffef74, 1.9, 0.08, {
+  metalness: 0.04,
+}));
 minuteHand.geometry.translate(0, 0.155, 0);
 minuteHand.position.set(0, 4.35, 0.752);
 towerGroup.add(minuteHand);
 
-const hourHand = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.205, 0.045), neonMat(0xffef74, 2.0, 0.12));
+const hourHand = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.205, 0.045), towerGlowMat(0xffef74, 1.72, 0.08, {
+  metalness: 0.04,
+}));
 hourHand.geometry.translate(0, 0.102, 0);
 hourHand.position.set(0, 4.35, 0.758);
 towerGroup.add(hourHand);
@@ -1340,7 +1404,7 @@ for (let i = 0; i < 3; i += 1) {
   }
   const cable = new THREE.Mesh(
     new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 220, 0.024, 8, false),
-    neonMat(i % 2 === 0 ? 0xff74f8 : 0x6fd9ff, 1.2 + i * 0.2, 0.14, {
+    towerGlowMat(i % 2 === 0 ? 0xff74f8 : 0x6fd9ff, 1.0 + i * 0.16, 0.08, {
       transparent: true,
       opacity: 0.92,
       clearcoat: 0.95,
@@ -1371,11 +1435,11 @@ const cityGeo = new THREE.BoxGeometry(1, 1, 1);
 const cityMat = new THREE.MeshPhysicalMaterial({
   color: 0x4d5faa,
   emissive: new THREE.Color(0x152459),
-  emissiveIntensity: 0.65,
-  roughness: 0.35,
-  metalness: 0.5,
-  clearcoat: 0.6,
-  clearcoatRoughness: 0.2,
+  emissiveIntensity: 0.18,
+  roughness: 0.56,
+  metalness: 0.18,
+  clearcoat: 0.34,
+  clearcoatRoughness: 0.28,
   vertexColors: true,
 });
 const city = new THREE.InstancedMesh(cityGeo, cityMat, cityCount);
@@ -1385,20 +1449,20 @@ const cityData = [];
 const cityCapMat = new THREE.MeshPhysicalMaterial({
   color: 0x77a9ff,
   emissive: new THREE.Color(0x2640a0),
-  emissiveIntensity: 1.1,
-  roughness: 0.24,
-  metalness: 0.46,
-  clearcoat: 0.8,
-  clearcoatRoughness: 0.18,
+  emissiveIntensity: 0.84,
+  roughness: 0.18,
+  metalness: 0.24,
+  clearcoat: 0.74,
+  clearcoatRoughness: 0.14,
   vertexColors: true,
 });
 const cityCaps = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cityCapMat, cityCount);
 const antennaMat = new THREE.MeshPhysicalMaterial({
   color: 0x9ed8ff,
   emissive: new THREE.Color(0xff79f8),
-  emissiveIntensity: 1.4,
-  roughness: 0.22,
-  metalness: 0.66,
+  emissiveIntensity: 1.22,
+  roughness: 0.1,
+  metalness: 0.42,
   clearcoat: 0.86,
   clearcoatRoughness: 0.12,
   vertexColors: true,
@@ -1543,10 +1607,7 @@ for (let i = 0; i < 4; i += 1) {
   strobeCones.push(cone);
 }
 
-const bloomPieces = towerGroup.children
-  .filter((m) => m.material)
-  .map((m) => m.material)
-  .concat([cityMat, cityCapMat, antennaMat]);
+const bloomPieces = towerGlowMaterials.concat([cityCapMat, antennaMat]);
 
 towerGroup.traverse((obj) => {
   if (obj.isMesh) {
@@ -2503,8 +2564,11 @@ const binaryControllerCtx = {
   binaryStarALight,
   binaryStarBLight,
   planetAtmosphere,
+  planetMesh,
   starAGroup,
+  starAVisual,
   starBGroup,
+  starBVisual,
   planetPivot,
   planetGroup,
   cloudLayer,
