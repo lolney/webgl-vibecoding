@@ -9,6 +9,7 @@
     "headless:lighting": "npm run build && node scripts/headless-lighting-regression.mjs",
     "headless:clocktower-lighting": "npm run build && node scripts/headless-clocktower-lighting.mjs",
     "headless:latitude": "npm run build && node scripts/headless-latitude-regression.mjs",
+    "headless:camera": "npm run build && node scripts/headless-camera-regression.mjs",
     "headless:ui": "npm run build && node scripts/headless-ui-regression.mjs",
     "headless:test-phase": "npm run headless:matrix && npm run headless:lighting && npm run headless:clocktower-lighting && npm run headless:latitude && npm run headless:ui",
     "headless:debug": "npm run build && node scripts/headless-render.mjs --debug",

@@ -1674,7 +1674,7 @@ function setObserverCoordinates(latitudeDeg, longitudeDeg, options = {}) {
   activePresetKey = "";
   hud.setPreset("");
   applyObserverTravelCoordinates(latitudeDeg, longitudeDeg);
-  if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
+  if (activeSceneKey === "binarySurface") updateSurfaceCamera(getSurfaceCinematicBlend());
   if (syncUrl) syncSceneToUrl(activeSceneKey, { pushHistory });
 }
 
@@ -1694,6 +1694,10 @@ function getSurfaceObserverState() {
     observerLongitude: THREE.MathUtils.degToRad(observerLongitudeBaseDeg || 0),
     viewerForwardWorld: surfaceViewerForwardWorld,
   });
+}
+
+function getSurfaceCinematicBlend() {
+  return activeSceneKey === "binarySurface" && cinematic ? cinematicMix : 0;
 }
 
 function updateSurfaceCamera(cinematicMix = 0) {
@@ -2129,6 +2133,9 @@ const sectionNames = ["Pulse Forge", "Hyper Lift", "Night Glide", "Strobe Core"]
 
 function setCinematic(on) {
   cinematic = on;
+  if (!cinematic && activeSceneKey === "binarySurface") {
+    cinematicMix = 0;
+  }
   if (activeSceneKey === "binarySurface") {
     modeBadge.textContent = on ? "Sun Track // Planet POV" : "Free Look // Planet POV";
     return;
@@ -2309,7 +2316,7 @@ window.__setBinaryTime = (hours) => {
   activePresetKey = "";
   hud.setPreset("");
   setBinaryClockHours(hours, { preserveContinuity: true });
-  if (activeSceneKey === "binarySurface") updateSurfaceCamera(cinematicMix);
+  if (activeSceneKey === "binarySurface") updateSurfaceCamera(getSurfaceCinematicBlend());
 };
 window.__getBinaryTime = () => binaryDayHours;
 window.__getBinarySimulationDays = () => binarySimulationDays;
@@ -2353,6 +2360,10 @@ window.__setScene = (sceneKey) => {
   activePresetKey = "";
   applySceneMode(sceneByKey[sceneKey] ? sceneKey : "clocktower");
 };
+window.__setCinematic = (on) => {
+  setCinematic(Boolean(on));
+};
+window.__getCinematic = () => cinematic;
 window.__setPreset = (presetKey) => {
   applyBinaryPreset(presetKey, { syncUrl: false });
 };
@@ -2571,7 +2582,9 @@ function tick() {
     controls.update();
   }
   const shouldCinematicBlend = cinematic;
-  cinematicMix = THREE.MathUtils.lerp(cinematicMix, shouldCinematicBlend ? 1 : 0, 0.02);
+  cinematicMix = activeSceneKey === "binarySurface" && !shouldCinematicBlend
+    ? 0
+    : THREE.MathUtils.lerp(cinematicMix, shouldCinematicBlend ? 1 : 0, 0.02);
   const dayAdvance = dt * binaryHourRateBase * binaryTimeMultiplier;
   binaryDayHours = THREE.MathUtils.euclideanModulo(
     binaryDayHours + dayAdvance,
@@ -2579,7 +2592,7 @@ function tick() {
   );
   binarySimulationDays += dayAdvance / 24;
   if (activeSceneKey === "binarySurface") {
-    updateSurfaceCamera(cinematicMix);
+    updateSurfaceCamera(getSurfaceCinematicBlend());
   }
 
   let sceneDebug = {};
