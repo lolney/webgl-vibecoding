@@ -66,6 +66,8 @@ assert(night.lighting.surfaceHazeOpacity < sunset.lighting.surfaceHazeOpacity, "
 assert(sunset.lighting.externalFogDensity > noon.lighting.externalFogDensity, "External fog density should rise toward sunset");
 assert(sunrise.lighting.primaryShaftStrength > noon.lighting.primaryShaftStrength, "Sunrise shaft strength should exceed noon");
 assert(sunset.lighting.secondaryShaftStrength > noon.lighting.secondaryShaftStrength, "Sunset secondary shaft strength should exceed noon");
+assert(sunrise.lighting.volumetricMediumDensity > noon.lighting.volumetricMediumDensity, "Sunrise medium density should exceed noon");
+assert(sunset.lighting.volumetricMediumDensity > night.lighting.volumetricMediumDensity * 0.9, "Sunset medium density should remain materially present");
 assert(night.lighting.primaryShaftStrength < 0.001, "Night primary shaft strength should be negligible");
 assert(secondSun.lighting.secondaryShaftStrength > secondSun.lighting.primaryShaftStrength, "Second-sun shafts should favor the visible secondary");
 assert(sunset.primaryAltitudeDeg > -1.0 && sunset.primaryAltitudeDeg < 1.0, "Sunset preset should place primary star at horizon");

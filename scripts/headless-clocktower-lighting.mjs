@@ -31,7 +31,11 @@ for (const entry of cases) {
 
 function readDebug(name) {
   const filePath = path.join(projectRoot, "output", `${name}-debug.json`);
-  return JSON.parse(fs.readFileSync(filePath, "utf8")).debug;
+  const payload = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  return {
+    ...payload.debug,
+    canvasStats: payload.canvasStats || null,
+  };
 }
 
 const hyperLift = readDebug("clocktower-hyper-lift");
@@ -49,12 +53,20 @@ assert(hyperLift.sectionOverride === 1, "Section override should be present in d
 assert(strobeCore.sectionOverride === 3, "Strobe Core override should be present in debug state");
 assert(hyperLift.lighting.beamIntensity > nightGlide.lighting.beamIntensity, "Hyper Lift beam intensity should exceed Night Glide");
 assert(hyperLift.lighting.beamConeOpacity > nightGlide.lighting.beamConeOpacity, "Hyper Lift beam cone should be more visible than Night Glide");
-assert(strobeCore.lighting.strobePeakIntensity > hyperLift.lighting.strobePeakIntensity, "Strobe Core should exceed Hyper Lift strobe peak intensity");
+assert(hyperLift.lighting.beamMediumDensity > nightGlide.lighting.beamMediumDensity, "Hyper Lift beam medium density should exceed Night Glide");
+assert(strobeCore.lighting.strobeMeanIntensity > hyperLift.lighting.strobeMeanIntensity, "Strobe Core should exceed Hyper Lift mean strobe intensity");
+assert(strobeCore.lighting.strobePeakMediumDensity > hyperLift.lighting.strobePeakMediumDensity, "Strobe Core medium density should exceed Hyper Lift");
+assert(strobeCore.lighting.strobePeakMediumDensity > nightGlide.lighting.strobePeakMediumDensity, "Strobe Core medium density should exceed Night Glide");
 assert(strobeCore.lighting.activeStrobes >= hyperLift.lighting.activeStrobes, "Strobe Core should have at least as many active strobes");
 assert(strobeCore.lighting.exposure < hyperLift.lighting.exposure, "Strobe Core exposure should compress below Hyper Lift");
 assert(nightGlide.lighting.moonIntensity > 0.6, "Night Glide moon intensity should remain non-trivial");
+assert(nightGlide.lighting.moonShaftStrength > 0.15, "Night Glide moon shaft strength should remain non-trivial");
 assert(hyperLift.lighting.moonAltitudeDeg > 5, "Moon should remain above the horizon in Hyper Lift");
 assert(nightGlide.lighting.moonReflectionStrength > 0.15, "Moon reflection should remain visible in Night Glide");
+assert((strobeCore.canvasStats?.leftEdgeBrightRatio ?? 1) < 0.12, "Strobe Core should avoid left-edge beam blowout");
+assert((strobeCore.canvasStats?.rightEdgeBrightRatio ?? 1) < 0.12, "Strobe Core should avoid right-edge beam blowout");
+assert((nightGlide.canvasStats?.leftEdgeBrightRatio ?? 1) < 0.04, "Night Glide should avoid left-edge blowout");
+assert((nightGlide.canvasStats?.rightEdgeBrightRatio ?? 1) < 0.04, "Night Glide should avoid right-edge blowout");
 
 console.log("Clocktower lighting regression OK.");
 console.log(JSON.stringify({

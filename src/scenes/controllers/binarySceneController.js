@@ -272,9 +272,12 @@ export function updateBinaryScene(ctx, frame) {
         surfaceBeamA.visible = true;
         surfaceBeamA.position.copy(sunPosA).add(shaftDirA.clone().multiplyScalar(volumetrics.primaryLength * 0.58));
         surfaceBeamA.quaternion.setFromRotationMatrix(shaftBasisA);
-        surfaceBeamA.scale.set(volumetrics.primaryRadius * 2.2, volumetrics.primaryLength, 1);
+        surfaceBeamA.scale.set(volumetrics.primaryRadius * 0.9, volumetrics.primaryLength, volumetrics.primaryRadius * 0.9);
         surfaceBeamA.material.uniforms.uColor.value.copy(primary.apparentColor);
         surfaceBeamA.material.uniforms.uStrength.value = volumetrics.primaryShaftStrength * 1.8;
+        surfaceBeamA.material.uniforms.uDensity.value = volumetrics.mediumDensity;
+        surfaceBeamA.material.uniforms.uAnisotropy.value = volumetrics.anisotropy;
+        surfaceBeamA.material.uniforms.uTime.value = t;
       }
 
       const primaryAhead = Math.max(0, orbit.primaryLocalDir.dot(surfaceForward));
@@ -315,9 +318,12 @@ export function updateBinaryScene(ctx, frame) {
         surfaceBeamB.visible = true;
         surfaceBeamB.position.copy(sunPosB).add(shaftDirB.clone().multiplyScalar(volumetrics.secondaryLength * 0.58));
         surfaceBeamB.quaternion.setFromRotationMatrix(shaftBasisB);
-        surfaceBeamB.scale.set(volumetrics.secondaryRadius * 2.1, volumetrics.secondaryLength, 1);
+        surfaceBeamB.scale.set(volumetrics.secondaryRadius * 0.92, volumetrics.secondaryLength, volumetrics.secondaryRadius * 0.92);
         surfaceBeamB.material.uniforms.uColor.value.copy(secondary.apparentColor);
         surfaceBeamB.material.uniforms.uStrength.value = volumetrics.secondaryShaftStrength * 1.8;
+        surfaceBeamB.material.uniforms.uDensity.value = volumetrics.mediumDensity * 0.94;
+        surfaceBeamB.material.uniforms.uAnisotropy.value = volumetrics.anisotropy;
+        surfaceBeamB.material.uniforms.uTime.value = t + 3.1;
       }
 
       const secondaryAhead = Math.max(0, orbit.secondaryLocalDir.dot(surfaceForward));

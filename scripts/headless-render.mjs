@@ -92,7 +92,58 @@ async function applyViewAndShot(page, view, localSlug) {
   if (shotStat.size < 5000) {
     throw new Error(`Screenshot too small (${shotStat.size} bytes), render likely failed`);
   }
+  const canvasStats = await page.evaluate(() => {
+    const source = window.__canvas || document.querySelector("canvas");
+    if (!source) return null;
+    const probe = document.createElement("canvas");
+    probe.width = source.width;
+    probe.height = source.height;
+    const ctx = probe.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(source, 0, 0);
+    const { data, width, height } = ctx.getImageData(0, 0, probe.width, probe.height);
+    let lumaSum = 0;
+    let peak = 0;
+    let brightPixels = 0;
+    let leftBrightPixels = 0;
+    let rightBrightPixels = 0;
+    let leftLumaSum = 0;
+    let rightLumaSum = 0;
+    const total = width * height;
+    const edgeBand = Math.max(1, Math.floor(width * 0.12));
+    for (let i = 0; i < data.length; i += 4) {
+      const pixelIndex = i / 4;
+      const x = pixelIndex % width;
+      const r = data[i] / 255;
+      const g = data[i + 1] / 255;
+      const b = data[i + 2] / 255;
+      const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+      lumaSum += luma;
+      if (luma > peak) peak = luma;
+      if (luma > 0.98) brightPixels += 1;
+      if (x < edgeBand) {
+        leftLumaSum += luma;
+        if (luma > 0.98) leftBrightPixels += 1;
+      } else if (x >= width - edgeBand) {
+        rightLumaSum += luma;
+        if (luma > 0.98) rightBrightPixels += 1;
+      }
+    }
+    return {
+      width,
+      height,
+      meanLuma: Number((lumaSum / Math.max(1, total)).toFixed(4)),
+      peakLuma: Number(peak.toFixed(4)),
+      brightPixelRatio: Number((brightPixels / Math.max(1, total)).toFixed(6)),
+      leftEdgeMeanLuma: Number((leftLumaSum / Math.max(1, edgeBand * height)).toFixed(4)),
+      rightEdgeMeanLuma: Number((rightLumaSum / Math.max(1, edgeBand * height)).toFixed(4)),
+      leftEdgeBrightRatio: Number((leftBrightPixels / Math.max(1, edgeBand * height)).toFixed(6)),
+      rightEdgeBrightRatio: Number((rightBrightPixels / Math.max(1, edgeBand * height)).toFixed(6)),
+    };
+  });
   const debugState = await page.evaluate(() => window.__demoState || null);
+  if (debugState) {
+    debugState.canvasStats = canvasStats;
+  }
   fs.writeFileSync(debugPath, JSON.stringify(debugState, null, 2));
   return { pagePath, canvasPath, debugPath };
 }

@@ -216,6 +216,71 @@ const sky = new THREE.Mesh(
 );
 scene.add(sky);
 
+function makeVolumetricCone(color, options = {}) {
+  const {
+    renderOrder = 118,
+    blending = THREE.AdditiveBlending,
+    depthTest = false,
+  } = options;
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, 1, 40, 24, true),
+    new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      depthTest,
+      side: THREE.DoubleSide,
+      blending,
+      toneMapped: false,
+      uniforms: {
+        uColor: { value: new THREE.Color(color) },
+        uStrength: { value: 0.0 },
+        uDensity: { value: 0.2 },
+        uAnisotropy: { value: 0.62 },
+        uTime: { value: 0.0 },
+      },
+      vertexShader: `
+        varying vec3 vLocalPos;
+        varying vec3 vWorldPos;
+        varying vec3 vBeamDir;
+        void main() {
+          vec4 world = modelMatrix * vec4(position, 1.0);
+          vLocalPos = position;
+          vWorldPos = world.xyz;
+          vBeamDir = normalize(mat3(modelMatrix) * vec3(0.0, 1.0, 0.0));
+          gl_Position = projectionMatrix * viewMatrix * world;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uStrength;
+        uniform float uDensity;
+        uniform float uAnisotropy;
+        uniform float uTime;
+        varying vec3 vLocalPos;
+        varying vec3 vWorldPos;
+        varying vec3 vBeamDir;
+        void main() {
+          float y = clamp(vLocalPos.y + 0.5, 0.0, 1.0);
+          float taper = mix(0.08, 1.0, y);
+          float radial = 1.0 - smoothstep(taper * 0.42, taper, length(vLocalPos.xz));
+          float axial = smoothstep(0.0, 0.08, y) * (1.0 - smoothstep(0.76, 1.0, y));
+          vec3 viewDir = normalize(cameraPosition - vWorldPos);
+          float phaseForward = max(dot(viewDir, -vBeamDir), 0.0);
+          float phase = pow(phaseForward, mix(2.0, 8.5, uAnisotropy));
+          float swirl = 0.88 + 0.12 * sin(vLocalPos.y * 18.0 + length(vLocalPos.xz) * 11.0 + uTime * 1.6);
+          float heightFog = mix(1.18, 0.7, y);
+          float alpha = radial * axial * phase * swirl * heightFog * uStrength * (0.32 + uDensity * 1.18);
+          vec3 color = mix(uColor, vec3(1.0), 0.18 + phase * 0.2) * (0.46 + phase * 1.05 + uDensity * 0.35);
+          gl_FragColor = vec4(color, alpha);
+        }
+      `,
+    }),
+  );
+  mesh.renderOrder = renderOrder;
+  mesh.visible = false;
+  return mesh;
+}
+
 const moonVisual = new THREE.Group();
 scene.add(moonVisual);
 
@@ -267,6 +332,14 @@ const moonHalo = new THREE.Mesh(
 );
 moonHalo.renderOrder = 91;
 moonVisual.add(moonHalo);
+
+const moonShaft = makeVolumetricCone(0xc4ddff, {
+  renderOrder: 89,
+  blending: THREE.NormalBlending,
+  depthTest: true,
+});
+moonShaft.scale.set(2.6, 16, 2.6);
+moonVisual.add(moonShaft);
 
 const stars = new THREE.Points(
   new THREE.BufferGeometry(),
@@ -840,53 +913,10 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
   return { group: g, core, glow };
 }
 
-function makeAtmosphericBeam(color) {
-  const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 1, 1, 24),
-    new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      depthTest: false,
-      side: THREE.DoubleSide,
-      blending: THREE.NormalBlending,
-      toneMapped: false,
-      uniforms: {
-        uColor: { value: new THREE.Color(color) },
-        uStrength: { value: 0.0 },
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 uColor;
-        uniform float uStrength;
-        varying vec2 vUv;
-        void main() {
-          vec2 p = vUv - 0.5;
-          float radial = 1.0 - smoothstep(0.0, 0.48, abs(p.x));
-          float axial = smoothstep(0.0, 0.26, vUv.y) * (1.0 - smoothstep(0.68, 1.0, vUv.y));
-          float taper = 1.0 - smoothstep(0.18, 0.5, abs(p.x) + (1.0 - vUv.y) * 0.18);
-          float streak = 0.9 + 0.1 * sin(vUv.y * 18.0 + p.x * 11.0);
-          float alpha = radial * axial * taper * streak * uStrength;
-          vec3 color = mix(uColor, vec3(1.0), 0.2) * (0.62 + alpha * 0.6);
-          gl_FragColor = vec4(color, alpha);
-        }
-      `,
-    }),
-  );
-  mesh.renderOrder = 118;
-  mesh.visible = false;
-  return mesh;
-}
-
 const surfaceSunA = makeSurfaceSun(0xfff2be, 0xffcb6d, 3.2, 16.0);
 const surfaceSunB = makeSurfaceSun(0xc6dbff, 0x7eb1ff, 2.4, 12.0);
-const surfaceBeamA = makeAtmosphericBeam(0xffd287);
-const surfaceBeamB = makeAtmosphericBeam(0x9fc6ff);
+const surfaceBeamA = makeVolumetricCone(0xffd287);
+const surfaceBeamB = makeVolumetricCone(0x9fc6ff);
 surfaceSunA.group.visible = false;
 surfaceSunB.group.visible = false;
 surfacePovGroup.add(surfaceSunA.group);
@@ -1322,15 +1352,12 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 const beaconBeam = new THREE.Mesh(
-  new THREE.ConeGeometry(1.1, 12.5, 40, 1, true),
-  new THREE.MeshBasicMaterial({
-    color: 0x59ddff,
-    transparent: true,
-    opacity: 0.18,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-  }),
+  new THREE.CylinderGeometry(1, 1, 1, 40, 24, true),
+  makeVolumetricCone(0x59ddff, {
+    renderOrder: 117,
+    blending: THREE.NormalBlending,
+    depthTest: true,
+  }).material,
 );
 beaconBeam.position.y = 12.8;
 beaconBeam.rotation.x = Math.PI;
@@ -1504,15 +1531,12 @@ for (let i = 0; i < 4; i += 1) {
   strobeSpots.push(spot);
 
   const cone = new THREE.Mesh(
-    new THREE.ConeGeometry(spot.distance * Math.tan(spot.angle), spot.distance, 48, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: strobeColors[i],
-      transparent: true,
-      opacity: 0.05,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-    }),
+    new THREE.CylinderGeometry(1, 1, 1, 40, 24, true),
+    makeVolumetricCone(strobeColors[i], {
+      renderOrder: 116,
+      blending: THREE.NormalBlending,
+      depthTest: true,
+    }).material,
   );
   cone.position.copy(spot.position);
   scene.add(cone);
@@ -2523,6 +2547,7 @@ const clocktowerControllerCtx = {
   moonVisual,
   moonDisk,
   moonHalo,
+  moonShaft,
   moonReflection,
   moonReflectionWide,
   moonDir,

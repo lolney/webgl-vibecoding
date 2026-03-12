@@ -326,6 +326,12 @@ function computeVolumetrics({ transport, primary, secondary }) {
       + transport.haze * 0.34
       + transport.daylight * 0.08,
   );
+  const mediumDensity = clamp01(
+    0.08
+      + transport.haze * 0.58
+      + transport.twilight * 0.22
+      + Math.max(primary.horizonFactor, secondary.horizonFactor * 0.84) * 0.1,
+  );
   const primaryStrength = primary.visibleFactor
     * atmosphericVisibility
     * Math.pow(primary.horizonFactor, 1.15)
@@ -344,6 +350,8 @@ function computeVolumetrics({ transport, primary, secondary }) {
     primaryRadius: THREE.MathUtils.lerp(4.0, 9.5, clamp01(primaryStrength * 1.2)),
     secondaryRadius: THREE.MathUtils.lerp(3.2, 7.4, clamp01(secondaryStrength * 1.5)),
     atmosphericVisibility,
+    mediumDensity,
+    anisotropy: THREE.MathUtils.lerp(0.42, 0.76, clamp01(transport.haze * 0.8 + transport.twilight * 0.3)),
   };
 }
 
@@ -584,6 +592,8 @@ export function lightingDebugState(lighting) {
     externalFogDensity: Number(lighting.aerialPerspective.external.fogDensity.toFixed(4)),
     primaryShaftStrength: Number(lighting.volumetrics.primaryShaftStrength.toFixed(4)),
     secondaryShaftStrength: Number(lighting.volumetrics.secondaryShaftStrength.toFixed(4)),
+    volumetricMediumDensity: Number(lighting.volumetrics.mediumDensity.toFixed(4)),
+    volumetricAnisotropy: Number(lighting.volumetrics.anisotropy.toFixed(4)),
     primaryLightIntensity: Number(lighting.illumination.primaryLightIntensity.toFixed(3)),
     secondaryLightIntensity: Number(lighting.illumination.secondaryLightIntensity.toFixed(3)),
     daylightFactor: Number(lighting.transport.daylight.toFixed(4)),

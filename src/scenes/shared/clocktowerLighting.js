@@ -58,6 +58,7 @@ export function computeClocktowerLightingState({ t, beat, level, section, strobe
   const beamPenumbra = 0.36 + haze * 0.24;
   const beamNorm = clamp01(beamIntensity / (clocktowerLightModel.beam.baseIntensity + clocktowerLightModel.beam.pulseGain * 3.2));
   const beamConeOpacity = clamp01(0.035 + haze * (0.12 + beamNorm * 0.2));
+  const beamMediumDensity = clamp01(0.12 + haze * 0.62 + beamNorm * 0.18);
   const beamSweep = Math.sin(t * 1.15) * (0.06 + beat * 0.04);
 
   const rimIntensity = (
@@ -71,6 +72,7 @@ export function computeClocktowerLightingState({ t, beat, level, section, strobe
     : clocktowerLightModel.strobe.sectionDefaultPeak;
   const strobeDistance = 40 + level * 7 + (section === 3 ? 4 : 0);
   const strobeExponent = section === 3 ? 7.8 : section === 1 ? 6.5 : 5.6;
+  const strobeDirectScale = section === 3 ? 0.24 : section === 1 ? 0.3 : 0.14;
   const strobeStates = [];
   let strobePeakIntensity = 0;
   let activeStrobes = 0;
@@ -84,15 +86,22 @@ export function computeClocktowerLightingState({ t, beat, level, section, strobe
       : 0;
     const gate = clamp01(Math.max(burst, sustain));
     const beatAmp = 0.92 + beat * 1.8;
-    const intensity = clocktowerLightModel.strobe.baseIntensity + gate * strobePeakBase * beatAmp;
+    const intensity = clocktowerLightModel.strobe.baseIntensity + gate * strobePeakBase * beatAmp * strobeDirectScale;
     const angle = 0.13 + (Math.sin(t * 0.7 + i) * 0.5 + 0.5) * (0.09 + level * 0.035);
-    const coneOpacity = clamp01(0.004 + haze * (0.028 + Math.sqrt(clamp01(intensity / (strobePeakBase * 1.3))) * 0.06));
+    const coneOpacity = clamp01(0.008 + haze * 0.024 + gate * (section === 3 ? 0.044 : 0.034));
+    const mediumDensity = clamp01(0.08 + haze * 0.52 + gate * (section === 3 ? 0.14 : 0.18));
     const coneStretch = 1 + level * 0.1 + gate * 0.08;
-    const target = {
-      x: Math.sin(t * 0.48 + i * 1.4) * 1.8,
-      y: 1.3 + Math.sin(t * 0.7 + i * 0.8) * 0.55,
-      z: Math.cos(t * 0.52 + i * 1.1) * 1.5,
-    };
+    const target = section === 3
+      ? {
+          x: Math.sin(t * 0.48 + i * 1.4) * 1.15,
+          y: 5.8 + Math.sin(t * 0.7 + i * 0.8) * 0.85,
+          z: Math.cos(t * 0.52 + i * 1.1) * 1.05,
+        }
+      : {
+          x: Math.sin(t * 0.48 + i * 1.4) * 1.8,
+          y: 1.3 + Math.sin(t * 0.7 + i * 0.8) * 0.55,
+          z: Math.cos(t * 0.52 + i * 1.1) * 1.5,
+        };
     if (gate > 0.18) activeStrobes += 1;
     strobePeakIntensity = Math.max(strobePeakIntensity, intensity);
     strobeEnergy += intensity;
@@ -101,6 +110,7 @@ export function computeClocktowerLightingState({ t, beat, level, section, strobe
       angle,
       distance: strobeDistance,
       coneOpacity,
+      mediumDensity,
       coneStretch,
       target,
       gate,
@@ -124,6 +134,7 @@ export function computeClocktowerLightingState({ t, beat, level, section, strobe
       haloPulse: 0.18 + level * 0.25 + beat * 0.38,
       reflectionPrimary: 1.2 + moonIntensity * clocktowerLightModel.moon.reflectionGainPrimary,
       reflectionWide: 0.82 + moonIntensity * clocktowerLightModel.moon.reflectionGainWide,
+      shaftStrength: clamp01(0.08 + haze * 0.34 + moonIntensity * 0.09),
     },
     beam: {
       intensity: beamIntensity,
@@ -131,6 +142,7 @@ export function computeClocktowerLightingState({ t, beat, level, section, strobe
       angle: beamAngle,
       penumbra: beamPenumbra,
       coneOpacity: beamConeOpacity,
+      mediumDensity: beamMediumDensity,
       sweep: beamSweep,
       radius: beamDistance * Math.tan(beamAngle),
     },
@@ -150,11 +162,14 @@ export function computeClocktowerLightingState({ t, beat, level, section, strobe
       moonIntensity,
       beamIntensity,
       beamConeOpacity,
+      beamMediumDensity,
       beamAngle,
       strobePeakIntensity,
       strobeMeanIntensity: strobeMean,
+      strobePeakMediumDensity: Math.max(...strobeStates.map((strobe) => strobe.mediumDensity), 0),
       activeStrobes,
       exposure: Math.min(Math.max(exposure, 0.48), 0.67),
+      moonShaftStrength: clamp01(0.08 + haze * 0.34 + moonIntensity * 0.09),
     },
   };
 }
@@ -166,11 +181,14 @@ export function clocktowerLightingDebugState(state) {
     moonIntensity: Number(state.debug.moonIntensity.toFixed(3)),
     beamIntensity: Number(state.debug.beamIntensity.toFixed(3)),
     beamConeOpacity: Number(state.debug.beamConeOpacity.toFixed(4)),
+    beamMediumDensity: Number(state.debug.beamMediumDensity.toFixed(4)),
     beamAngle: Number(state.debug.beamAngle.toFixed(4)),
     strobePeakIntensity: Number(state.debug.strobePeakIntensity.toFixed(3)),
     strobeMeanIntensity: Number(state.debug.strobeMeanIntensity.toFixed(3)),
+    strobePeakMediumDensity: Number(state.debug.strobePeakMediumDensity.toFixed(4)),
     activeStrobes: state.debug.activeStrobes,
     exposure: Number(state.debug.exposure.toFixed(4)),
+    moonShaftStrength: Number(state.debug.moonShaftStrength.toFixed(4)),
   };
 }
 

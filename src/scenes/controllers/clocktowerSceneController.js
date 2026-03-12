@@ -22,6 +22,7 @@ export function updateClocktowerScene(ctx, frame) {
     moonVisual,
     moonDisk,
     moonHalo,
+    moonShaft,
     moonReflection,
     moonReflectionWide,
     moonDir,
@@ -132,6 +133,23 @@ export function updateClocktowerScene(ctx, frame) {
   moonHalo.material.uniforms.uPulse.value = lighting.moon.haloPulse * moonState.haloPulse;
   moonHalo.scale.setScalar(moonState.haloScale);
 
+  moonShaft.visible = lighting.moon.shaftStrength * moonState.reflectionStrength > 0.02;
+  if (moonShaft.visible) {
+    const shaftTarget = moonState.reflectionCenter.clone().add(new THREE.Vector3(0, 1.5, 0));
+    const shaftDir = shaftTarget.clone().sub(moonVisual.position);
+    const shaftLen = shaftDir.length();
+    shaftDir.normalize();
+    moonShaft.position.copy(moonVisual.position).add(shaftDir.clone().multiplyScalar(shaftLen * 0.48));
+    moonShaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), shaftDir);
+    const shaftRadius = THREE.MathUtils.lerp(1.2, 2.8, lighting.moon.shaftStrength);
+    moonShaft.scale.set(shaftRadius, shaftLen, shaftRadius);
+    moonShaft.material.uniforms.uColor.value.copy(moonState.discColor);
+    moonShaft.material.uniforms.uStrength.value = lighting.moon.shaftStrength * moonState.reflectionStrength * 0.75;
+    moonShaft.material.uniforms.uDensity.value = lighting.beam.mediumDensity * 0.78;
+    moonShaft.material.uniforms.uAnisotropy.value = 0.58;
+    moonShaft.material.uniforms.uTime.value = t * 0.5;
+  }
+
   moonReflection.position.copy(moonState.reflectionCenter);
   moonReflection.position.z = Math.min(moonReflection.position.z, shorelineZ - 2.4);
   moonReflection.scale.set(
@@ -154,12 +172,17 @@ export function updateClocktowerScene(ctx, frame) {
   moonReflectionWide.material.uniforms.uStrength.value = lighting.moon.reflectionWide * moonState.reflectionStrength;
 
   beaconBeam.rotation.z = lighting.beam.sweep;
-  beaconBeam.material.opacity = lighting.beam.coneOpacity;
+  beaconBeam.position.y = 12.8 + lighting.beam.distance * 0.48;
   beaconBeam.scale.set(
-    THREE.MathUtils.clamp(lighting.beam.radius / 1.1, 0.9, 3.4),
-    THREE.MathUtils.clamp(lighting.beam.distance / 12.5, 0.9, 5.4),
-    THREE.MathUtils.clamp(lighting.beam.radius / 1.1, 0.9, 3.4),
+    THREE.MathUtils.clamp(lighting.beam.radius * 0.22, 0.65, 2.4),
+    lighting.beam.distance,
+    THREE.MathUtils.clamp(lighting.beam.radius * 0.22, 0.65, 2.4),
   );
+  beaconBeam.material.uniforms.uColor.value.setHex(0x59ddff);
+  beaconBeam.material.uniforms.uStrength.value = lighting.beam.coneOpacity * 0.3;
+  beaconBeam.material.uniforms.uDensity.value = lighting.beam.mediumDensity;
+  beaconBeam.material.uniforms.uAnisotropy.value = 0.72;
+  beaconBeam.material.uniforms.uTime.value = t;
   displaceWaterGeometry(oceanGeometry, oceanBasePos, t * 0.9, 1.15 + level * 0.3 + beat * 0.45);
   displaceWaterGeometry(farOceanGeometry, farOceanBasePos, t * 0.72 + 5.0, 0.95 + level * 0.2);
 
@@ -181,7 +204,6 @@ export function updateClocktowerScene(ctx, frame) {
     const target = strobeTargets[i];
     const cone = strobeCones[i];
     const strobe = lighting.strobes[i];
-    spot.intensity = strobe.intensity;
     spot.angle = strobe.angle;
     spot.distance = strobe.distance;
 
@@ -192,22 +214,26 @@ export function updateClocktowerScene(ctx, frame) {
     cone.quaternion.setFromUnitVectors(upAxis, tmpDir);
     const cameraToSpot = camera.position.clone().sub(spot.position).normalize();
     const viewAlignment = Math.abs(tmpDir.dot(cameraToSpot));
-    const viewFade = 1 - THREE.MathUtils.smoothstep(viewAlignment, 0.38, 0.9);
+    const spotFacingFade = 1 - THREE.MathUtils.smoothstep(viewAlignment, 0.7, 0.94);
+    spot.intensity = (strobe.gate > 0.12 ? strobe.intensity : 0) * spotFacingFade;
+    const viewFade = Math.pow(1 - THREE.MathUtils.smoothstep(viewAlignment, 0.26, 0.72), 1.35);
     const cameraOffset = camera.position.clone().sub(spot.position);
     const axisProjection = THREE.MathUtils.clamp(cameraOffset.dot(tmpDir), 0, strobe.distance);
     const closestPoint = spot.position.clone().add(tmpDir.clone().multiplyScalar(axisProjection));
     const radialDistance = closestPoint.distanceTo(camera.position);
     const coneRadiusAtCamera = Math.max(0.22, Math.tan(strobe.angle) * axisProjection);
     const insideFade = THREE.MathUtils.smoothstep(radialDistance / coneRadiusAtCamera, 0.72, 1.08);
-    const sectionConeScale = section === 3 ? 0.62 : 0.0;
-    cone.material.opacity = strobe.coneOpacity * viewFade * insideFade * sectionConeScale;
-    cone.visible = section === 3 && cone.material.opacity > 0.002;
-    const radiusScale = THREE.MathUtils.clamp(
-      (strobe.distance * Math.tan(strobe.angle)) / (58 * Math.tan(0.2)),
-      0.8,
-      2.8,
-    );
-    cone.scale.set(radiusScale, (strobe.distance / 58) * strobe.coneStretch, radiusScale);
+    const sectionConeScale = section === 3 ? 0.22 : 0.0;
+    const coneStrength = strobe.coneOpacity * viewFade * insideFade * sectionConeScale;
+    cone.visible = section === 3 && coneStrength > 0.002;
+    const coneRadius = THREE.MathUtils.clamp(strobe.distance * Math.tan(strobe.angle) * 0.065, 0.24, 0.82);
+    cone.position.copy(spot.position).add(tmpDir.clone().multiplyScalar(strobe.distance * 0.5));
+    cone.scale.set(coneRadius, strobe.distance * strobe.coneStretch, coneRadius);
+    cone.material.uniforms.uColor.value.copy(spot.color);
+    cone.material.uniforms.uStrength.value = coneStrength * 0.032;
+    cone.material.uniforms.uDensity.value = strobe.mediumDensity;
+    cone.material.uniforms.uAnisotropy.value = 0.68;
+    cone.material.uniforms.uTime.value = t + i * 0.7;
   }
 
   ringGroup.children.forEach((ring, i) => {

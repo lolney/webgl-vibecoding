@@ -55,7 +55,7 @@
 - [ ] Next-level backlog:
   - [ ] Rendering realism upgrades
     - [x] Multi-order atmospheric scattering approximation
-    - [ ] True volumetric participating media for stars, moonlight, and clocktower beams
+    - [x] True volumetric participating media for stars, moonlight, and clocktower beams
     - [ ] Better ocean BRDF and reflected-sky integration
     - [ ] Stronger material separation and PBR response across stars, planets, water, tower surfaces, and emissives
   - [ ] New scenes
