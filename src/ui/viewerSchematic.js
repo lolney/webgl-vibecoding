@@ -171,6 +171,7 @@ export function createViewerSchematic({ root = document, onLatitudeAdjust = null
     const primaryDir = normalize3(data.primaryDir || [1, 0, 0]);
     const secondaryDir = normalize3(data.secondaryDir || [0, 0, 1]);
     const spinAxis = normalize3(data.spinAxis || [0, 1, 0]);
+    const travelNorth = normalize3(data.travelNorth || projectToTangent(spinAxis, observerNormal));
     const latitudeDeg = Number(data.latitudeDeg) || 0;
     const planetAxes = buildPlanetAxes(spinAxis);
 
@@ -181,7 +182,7 @@ export function createViewerSchematic({ root = document, onLatitudeAdjust = null
 
     const anchorVec = normalize3(add(add(scale(right, 0.48), scale(up, -0.5)), scale(forward, 0.72)));
     const anchorNorth = projectToTangent(add(scale(up, 0.9), scale(right, -0.08)), anchorVec);
-    const localNorth = projectToTangent(spinAxis, observerNormal);
+    const localNorth = projectToTangent(travelNorth, observerNormal);
     const qAlign = quaternionFromUnitVectors(observerNormal, anchorVec);
     const rotatedNorth = projectToTangent(rotateVec(localNorth, qAlign), anchorVec);
     const twist = signedAngle(rotatedNorth, anchorNorth, anchorVec);

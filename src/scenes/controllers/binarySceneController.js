@@ -54,10 +54,11 @@ export function updateBinaryScene(ctx, frame) {
     activeSceneKey,
     binaryDayHours,
     binarySimulationDays,
+    observerLatitudeTravelDeg,
+    observerLongitudeBaseDeg,
     observerLatitudeDeg,
     observerLongitudeDeg,
-    surfaceYaw = null,
-    surfacePitch = 0,
+    surfaceViewerForwardWorld = null,
     debugView,
   } = frame;
 
@@ -70,10 +71,15 @@ export function updateBinaryScene(ctx, frame) {
     planetOrbitRadius,
     cameraPosition: camera.position,
     cameraTarget: controls.target,
-    observerLatitude: THREE.MathUtils.degToRad(observerLatitudeDeg || 0),
-    observerLongitude: THREE.MathUtils.degToRad(observerLongitudeDeg || 0),
-    viewerHeadingYaw: isSurfaceScene ? surfaceYaw : null,
-    viewerPitch: isSurfaceScene ? surfacePitch : 0,
+    observerLatitude: THREE.MathUtils.degToRad(
+      isSurfaceScene ? (observerLatitudeTravelDeg || 0) : (observerLatitudeDeg || 0),
+    ),
+    observerLongitude: THREE.MathUtils.degToRad(
+      isSurfaceScene ? (observerLongitudeBaseDeg || 0) : (observerLongitudeDeg || 0),
+    ),
+    viewerForwardWorld: isSurfaceScene && surfaceViewerForwardWorld instanceof THREE.Vector3
+      ? surfaceViewerForwardWorld
+      : null,
   });
   const lighting = computeLightingState(orbit);
   const { primary, secondary } = lighting;
@@ -412,12 +418,13 @@ export function updateBinaryScene(ctx, frame) {
       orbitRadius: orbit.orbitRadius,
     },
     viewerInset: {
-      latitudeDeg: THREE.MathUtils.radToDeg(orbit.observerLatitude),
+      latitudeDeg: observerLatitudeDeg,
       observerNormal: [orbit.observerNormal.x, orbit.observerNormal.y, orbit.observerNormal.z],
       viewerTangent: [orbit.viewerTangentWorld.x, orbit.viewerTangentWorld.y, orbit.viewerTangentWorld.z],
       primaryDir: [orbit.primaryDir.x, orbit.primaryDir.y, orbit.primaryDir.z],
       secondaryDir: [orbit.secondaryDir.x, orbit.secondaryDir.y, orbit.secondaryDir.z],
       spinAxis: [orbit.spinAxis.x, orbit.spinAxis.y, orbit.spinAxis.z],
+      travelNorth: [orbit.travelNorth.x, orbit.travelNorth.y, orbit.travelNorth.z],
       viewerLightDot: orbit.viewerLightDot,
     },
     lighting: lightingDebugState(lighting),

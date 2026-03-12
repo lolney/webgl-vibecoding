@@ -37,14 +37,19 @@ function toXZUnit(vec3, fallback = null) {
   return v.normalize();
 }
 
-function buildLocalFrame(observerNormal, spinAxis) {
-  const east = new THREE.Vector3().crossVectors(spinAxis, observerNormal);
+function buildContinuousLocalFrame(observerNormal, travelNorth) {
+  const north = projectToTangent(travelNorth, observerNormal);
+  if (north.lengthSq() < 1e-8) {
+    north.set(0, 0, 1);
+  } else {
+    north.normalize();
+  }
+  const east = new THREE.Vector3().crossVectors(north, observerNormal);
   if (east.lengthSq() < 1e-8) {
     east.set(1, 0, 0);
   } else {
     east.normalize();
   }
-  const north = new THREE.Vector3().crossVectors(observerNormal, east).normalize();
   return { east, north };
 }
 
@@ -56,6 +61,7 @@ export function computeBinarySimulationState({
   cameraTarget,
   observerLatitude = 0,
   observerLongitude = 0,
+  viewerForwardWorld = null,
   viewerHeadingYaw = null,
   viewerPitch = 0,
 }) {
@@ -96,17 +102,28 @@ export function computeBinarySimulationState({
   noonMeridian.normalize();
   const eastReference = new THREE.Vector3().crossVectors(spinAxis, noonMeridian).normalize();
 
-  const observerNormal = noonMeridian
+  const equatorReference = noonMeridian
     .clone()
-    .multiplyScalar(cosLat * Math.cos(localHourAngle))
-    .add(eastReference.clone().multiplyScalar(cosLat * Math.sin(localHourAngle)))
+    .multiplyScalar(Math.cos(localHourAngle))
+    .add(eastReference.clone().multiplyScalar(Math.sin(localHourAngle)))
+    .normalize();
+  const observerNormal = equatorReference
+    .clone()
+    .multiplyScalar(cosLat)
     .add(spinAxis.clone().multiplyScalar(Math.sin(observerLatitude)))
+    .normalize();
+  const travelNorth = equatorReference
+    .clone()
+    .multiplyScalar(-Math.sin(observerLatitude))
+    .add(spinAxis.clone().multiplyScalar(cosLat))
     .normalize();
   const spinDir = new THREE.Vector2(observerNormal.x, observerNormal.z).normalize();
 
   // Viewer turning changes heading only; it does not move observer location.
-  const { east, north } = buildLocalFrame(observerNormal, spinAxis);
-  const lookWorld = Number.isFinite(viewerHeadingYaw)
+  const { east, north } = buildContinuousLocalFrame(observerNormal, travelNorth);
+  const lookWorld = viewerForwardWorld instanceof THREE.Vector3
+    ? viewerForwardWorld.clone().normalize()
+    : Number.isFinite(viewerHeadingYaw)
     ? east.clone()
       .multiplyScalar(Math.sin(viewerHeadingYaw) * Math.cos(viewerPitch))
       .add(north.clone().multiplyScalar(Math.cos(viewerHeadingYaw) * Math.cos(viewerPitch)))
@@ -186,6 +203,7 @@ export function computeBinarySimulationState({
     observerLatitude,
     observerLongitude,
     observerNormal,
+    travelNorth,
     viewerTangentWorld,
     east,
     north,

@@ -1581,17 +1581,20 @@ let pendingInitialOrbitView = resolvedInitialBinaryState.orbitView;
 let pendingInitialSurfacePitch = resolvedInitialBinaryState.surfacePitch;
 const surfaceObserverAnchor = new THREE.Vector3();
 const surfaceLookDir = new THREE.Vector3(0, 0.04, 1).normalize();
+const surfaceViewerForwardWorld = new THREE.Vector3(0, 0, 1);
 const surfaceViewDistanceMin = 11.8;
 const surfaceViewDistanceMax = 13.2;
 const surfacePitchMin = -0.12;
 const surfacePitchMax = 1.12;
 let surfaceViewDistance = 12.4;
-let surfaceYaw = 0;
-let surfacePitch = -0.02;
 let lastTickTime = 0;
 let debugSectionOverride = null;
 let debugBeatOverride = null;
 let debugLevelOverride = null;
+const surfaceQuatA = new THREE.Quaternion();
+const surfaceQuatB = new THREE.Quaternion();
+const surfaceVecA = new THREE.Vector3();
+const surfaceVecB = new THREE.Vector3();
 
 function wrapAngle(angle) {
   return THREE.MathUtils.euclideanModulo(angle + Math.PI, Math.PI * 2) - Math.PI;
@@ -1599,6 +1602,46 @@ function wrapAngle(angle) {
 
 function lerpAngle(from, to, t) {
   return from + wrapAngle(to - from) * t;
+}
+
+function projectVectorToTangent(vec, up) {
+  const tangent = vec.clone().sub(up.clone().multiplyScalar(vec.dot(up)));
+  if (tangent.lengthSq() < 1e-8) return tangent.set(0, 0, 1);
+  return tangent.normalize();
+}
+
+function localDirectionFromAngles(yaw, pitch) {
+  const cosPitch = Math.cos(pitch);
+  return new THREE.Vector3(
+    Math.sin(yaw) * cosPitch,
+    Math.sin(pitch),
+    Math.cos(yaw) * cosPitch,
+  ).normalize();
+}
+
+function worldDirectionFromLocal(localDir, orbit) {
+  return orbit.east.clone().multiplyScalar(localDir.x)
+    .add(orbit.observerNormal.clone().multiplyScalar(localDir.y))
+    .add(orbit.north.clone().multiplyScalar(localDir.z))
+    .normalize();
+}
+
+function localDirectionFromWorld(worldDir, orbit) {
+  return new THREE.Vector3(
+    worldDir.dot(orbit.east),
+    worldDir.dot(orbit.observerNormal),
+    worldDir.dot(orbit.north),
+  ).normalize();
+}
+
+function clampSurfaceForwardWorld(forwardWorld, upWorld) {
+  const pitch = Math.asin(THREE.MathUtils.clamp(forwardWorld.dot(upWorld), -1, 1));
+  const clampedPitch = THREE.MathUtils.clamp(pitch, surfacePitchMin, surfacePitchMax);
+  const tangent = projectVectorToTangent(forwardWorld, upWorld);
+  const horizontal = Math.cos(clampedPitch);
+  return tangent.multiplyScalar(horizontal)
+    .add(upWorld.clone().multiplyScalar(Math.sin(clampedPitch)))
+    .normalize();
 }
 
 function applyObserverTravelCoordinates(latitudeTravelDeg, longitudeBaseDeg) {
@@ -1631,34 +1674,19 @@ function getSurfaceObserverState() {
     planetOrbitRadius,
     cameraPosition: surfaceObserverAnchor,
     cameraTarget: surfaceObserverAnchor.clone().add(surfaceLookDir),
-    observerLatitude: THREE.MathUtils.degToRad(observerLatitudeDeg || 0),
-    observerLongitude: THREE.MathUtils.degToRad(observerLongitudeDeg || 0),
-    viewerHeadingYaw: surfaceYaw,
-    viewerPitch: surfacePitch,
+    observerLatitude: THREE.MathUtils.degToRad(observerLatitudeTravelDeg || 0),
+    observerLongitude: THREE.MathUtils.degToRad(observerLongitudeBaseDeg || 0),
+    viewerForwardWorld: surfaceViewerForwardWorld,
   });
 }
 
 function updateSurfaceCamera(cinematicMix = 0) {
   const orbit = getSurfaceObserverState();
   if (cinematicMix > 0.001) {
-    const targetYaw = Math.atan2(orbit.primaryLocalDir.x, orbit.primaryLocalDir.z);
-    const targetPitch = THREE.MathUtils.clamp(
-      Math.asin(THREE.MathUtils.clamp(orbit.primaryLocalDir.y, -1, 1)) * 0.72 - 0.02,
-      surfacePitchMin,
-      surfacePitchMax,
-    );
-    surfaceYaw = lerpAngle(surfaceYaw, targetYaw, cinematicMix * 0.14);
-    surfacePitch = THREE.MathUtils.lerp(surfacePitch, targetPitch, cinematicMix * 0.14);
+    surfaceViewerForwardWorld.lerp(orbit.primaryDir, cinematicMix * 0.14).normalize();
   }
-  surfacePitch = THREE.MathUtils.clamp(surfacePitch, surfacePitchMin, surfacePitchMax);
-  const cosPitch = Math.cos(surfacePitch);
-  surfaceLookDir
-    .set(
-      Math.sin(surfaceYaw) * cosPitch,
-      Math.sin(surfacePitch),
-      Math.cos(surfaceYaw) * cosPitch,
-    )
-    .normalize();
+  const localLook = localDirectionFromWorld(surfaceViewerForwardWorld, orbit);
+  surfaceLookDir.copy(localLook);
   camera.position.copy(surfaceObserverAnchor);
   controls.target.copy(surfaceObserverAnchor).add(surfaceLookDir.clone().multiplyScalar(surfaceViewDistance));
   camera.up.set(0, 1, 0);
@@ -1668,6 +1696,25 @@ function updateSurfaceCamera(cinematicMix = 0) {
 function updateTimeRateLabel() {
   if (!timeRateButton) return;
   timeRateButton.textContent = `${binaryTimeMultiplier}x`;
+}
+
+function setSurfaceForwardFromOrbit(orbit, yaw, pitch) {
+  const localForward = localDirectionFromAngles(yaw, pitch);
+  surfaceViewerForwardWorld.copy(
+    worldDirectionFromLocal(localForward, orbit),
+  );
+}
+
+function aimSurfaceForwardAtPrimary(orbit, pitchOverride = null) {
+  const targetYaw = Math.atan2(orbit.primaryLocalDir.x, orbit.primaryLocalDir.z);
+  const targetPitch = THREE.MathUtils.clamp(
+    Number.isFinite(pitchOverride)
+      ? pitchOverride
+      : (Math.asin(THREE.MathUtils.clamp(orbit.primaryLocalDir.y, -1, 1)) * 0.5 - 0.03),
+    surfacePitchMin,
+    surfacePitchMax,
+  );
+  setSurfaceForwardFromOrbit(orbit, targetYaw, targetPitch);
 }
 
 function setBinaryClockHours(hours, options = {}) {
@@ -1701,8 +1748,8 @@ function getRuntimeUrlState(overrides = {}) {
     scene: overrides.scene || activeSceneKey,
     preset: Object.prototype.hasOwnProperty.call(overrides, "preset") ? overrides.preset : activePresetKey,
     binaryHour: Object.prototype.hasOwnProperty.call(overrides, "binaryHour") ? overrides.binaryHour : binaryDayHours,
-    binaryLat: Object.prototype.hasOwnProperty.call(overrides, "binaryLat") ? overrides.binaryLat : observerLatitudeDeg,
-    binaryLon: Object.prototype.hasOwnProperty.call(overrides, "binaryLon") ? overrides.binaryLon : observerLongitudeDeg,
+    binaryLat: Object.prototype.hasOwnProperty.call(overrides, "binaryLat") ? overrides.binaryLat : observerLatitudeTravelDeg,
+    binaryLon: Object.prototype.hasOwnProperty.call(overrides, "binaryLon") ? overrides.binaryLon : observerLongitudeBaseDeg,
     binaryHourRate: binaryHourRateBase,
     timeMultiplier: Object.prototype.hasOwnProperty.call(overrides, "timeMultiplier") ? overrides.timeMultiplier : binaryTimeMultiplier,
     cinematic: Object.prototype.hasOwnProperty.call(overrides, "cinematic") ? overrides.cinematic : cinematic,
@@ -1749,14 +1796,7 @@ function applyBinaryPreset(presetKey, options = {}) {
   if (activeSceneKey === "binarySurface") {
     surfaceObserverAnchor.set(0, 1.42, 0);
     const orbit = getSurfaceObserverState();
-    surfaceYaw = Math.atan2(orbit.primaryLocalDir.x, orbit.primaryLocalDir.z);
-    surfacePitch = THREE.MathUtils.clamp(
-      Number.isFinite(presetState.surfacePitch)
-        ? presetState.surfacePitch
-        : (Math.asin(THREE.MathUtils.clamp(orbit.primaryLocalDir.y, -1, 1)) * 0.5 - 0.03),
-      surfacePitchMin,
-      surfacePitchMax,
-    );
+    aimSurfaceForwardAtPrimary(orbit, presetState.surfacePitch);
     updateSurfaceCamera(0);
   } else if (presetState.orbitView && typeof window.__setOrbitView === "function") {
     window.__setOrbitView(presetState.orbitView);
@@ -1828,12 +1868,7 @@ function applySceneMode(nextSceneKey, options = {}) {
     surfaceObserverAnchor.set(0, 1.42, 0);
     surfaceViewDistance = 12.4;
     const orbit = getSurfaceObserverState();
-    surfaceYaw = Math.atan2(orbit.primaryLocalDir.x, orbit.primaryLocalDir.z);
-    surfacePitch = THREE.MathUtils.clamp(
-      Math.asin(THREE.MathUtils.clamp(orbit.primaryLocalDir.y, -1, 1)) * 0.5 - 0.03,
-      -0.06,
-      0.16,
-    );
+    aimSurfaceForwardAtPrimary(orbit, -0.03);
     updateSurfaceCamera(0);
   }
   controls.enabled = activeSceneKey !== "binarySurface";
@@ -2137,8 +2172,19 @@ window.addEventListener("pointermove", (e) => {
   const dy = e.clientY - surfacePointerLastY;
   surfacePointerLastX = e.clientX;
   surfacePointerLastY = e.clientY;
-  surfaceYaw -= dx * 0.0052;
-  surfacePitch = THREE.MathUtils.clamp(surfacePitch - dy * 0.0032, surfacePitchMin, surfacePitchMax);
+  const orbit = getSurfaceObserverState();
+  surfaceQuatA.setFromAxisAngle(orbit.observerNormal, -dx * 0.0052);
+  surfaceViewerForwardWorld.applyQuaternion(surfaceQuatA).normalize();
+  const right = surfaceVecA.crossVectors(surfaceViewerForwardWorld, orbit.observerNormal);
+  if (right.lengthSq() > 1e-8) {
+    right.normalize();
+    surfaceQuatB.setFromAxisAngle(right, -dy * 0.0032);
+    surfaceViewerForwardWorld.applyQuaternion(surfaceQuatB).normalize();
+  }
+  surfaceViewerForwardWorld.copy(
+    clampSurfaceForwardWorld(surfaceViewerForwardWorld, orbit.observerNormal),
+  );
+  updateSurfaceCamera(0);
   markInteraction();
 });
 function releaseSurfacePointer(e) {
@@ -2251,12 +2297,12 @@ window.__getBinaryTime = () => binaryDayHours;
 window.__getBinarySimulationDays = () => binarySimulationDays;
 window.__setObserverLatitude = (latDeg) => {
   if (!Number.isFinite(latDeg)) return;
-  setObserverCoordinates(latDeg, observerLongitudeDeg);
+  setObserverCoordinates(latDeg, observerLongitudeBaseDeg);
 };
 window.__getObserverLatitude = () => observerLatitudeDeg;
 window.__setObserverLongitude = (lonDeg) => {
   if (!Number.isFinite(lonDeg)) return;
-  setObserverCoordinates(observerLatitudeDeg, lonDeg);
+  setObserverCoordinates(observerLatitudeTravelDeg, lonDeg);
 };
 window.__getObserverLongitude = () => observerLongitudeDeg;
 window.__setTimeMultiplier = (mult) => {
@@ -2315,8 +2361,12 @@ window.__setOrbitView = (view = {}) => {
     activePresetKey = "";
     hud.setPreset("");
     surfaceViewDistance = clampedDistance;
-    surfaceYaw = azimuth;
-    surfacePitch = THREE.MathUtils.clamp((Math.PI / 2) - polar, surfacePitchMin, surfacePitchMax);
+    const orbit = getSurfaceObserverState();
+    const localForward = localDirectionFromAngles(
+      azimuth,
+      THREE.MathUtils.clamp((Math.PI / 2) - polar, surfacePitchMin, surfacePitchMax),
+    );
+    surfaceViewerForwardWorld.copy(worldDirectionFromLocal(localForward, orbit));
     updateSurfaceCamera(0);
   } else {
     controls.target.set(tx, ty, tz);
@@ -2325,8 +2375,12 @@ window.__setOrbitView = (view = {}) => {
     controls.update();
   }
   return {
-    azimuth: activeSceneKey === "binarySurface" ? surfaceYaw : controls.getAzimuthalAngle(),
-    polar: activeSceneKey === "binarySurface" ? ((Math.PI / 2) - surfacePitch) : controls.getPolarAngle(),
+    azimuth: activeSceneKey === "binarySurface"
+      ? Math.atan2(surfaceLookDir.x, surfaceLookDir.z)
+      : controls.getAzimuthalAngle(),
+    polar: activeSceneKey === "binarySurface"
+      ? ((Math.PI / 2) - Math.asin(THREE.MathUtils.clamp(surfaceLookDir.y, -1, 1)))
+      : controls.getPolarAngle(),
     distance: camera.position.distanceTo(controls.target),
     target: controls.target.toArray(),
   };
@@ -2512,10 +2566,11 @@ function tick() {
       activeSceneKey,
       binaryDayHours,
       binarySimulationDays,
+      observerLatitudeTravelDeg,
+      observerLongitudeBaseDeg,
       observerLatitudeDeg,
       observerLongitudeDeg,
-      surfaceYaw,
-      surfacePitch,
+      surfaceViewerForwardWorld,
       debugView,
     });
     orbitSchematic.render(activeSceneKey === "binarySurface" ? sceneDebug.schematic : null);
@@ -2593,6 +2648,16 @@ function tick() {
     observerLongitudeBaseDeg: Number(observerLongitudeBaseDeg.toFixed(2)),
     observerLatitudeDeg: Number(observerLatitudeDeg.toFixed(2)),
     observerLongitudeDeg: Number(observerLongitudeDeg.toFixed(2)),
+    surfaceLookLocal: [
+      Number(surfaceLookDir.x.toFixed(3)),
+      Number(surfaceLookDir.y.toFixed(3)),
+      Number(surfaceLookDir.z.toFixed(3)),
+    ],
+    surfaceForwardWorld: [
+      Number(surfaceViewerForwardWorld.x.toFixed(3)),
+      Number(surfaceViewerForwardWorld.y.toFixed(3)),
+      Number(surfaceViewerForwardWorld.z.toFixed(3)),
+    ],
     cameraPos: [Number(camera.position.x.toFixed(3)), Number(camera.position.y.toFixed(3)), Number(camera.position.z.toFixed(3))],
     cameraTarget: [Number(controls.target.x.toFixed(3)), Number(controls.target.y.toFixed(3)), Number(controls.target.z.toFixed(3))],
     ...sceneDebug,

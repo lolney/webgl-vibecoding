@@ -26,6 +26,13 @@ function approx(a, b, tolerance, label) {
   assert(Math.abs(a - b) <= tolerance, `${label}: expected ${b}, got ${a}`);
 }
 
+function approxVec(vec, expected, tolerance, label) {
+  assert(Array.isArray(vec) && vec.length === expected.length, `${label}: invalid vector`);
+  for (let i = 0; i < expected.length; i += 1) {
+    approx(vec[i], expected[i], tolerance, `${label}[${i}]`);
+  }
+}
+
 const server = http.createServer((req, res) => {
   try {
     const parsed = new URL(req.url, "http://127.0.0.1");
@@ -111,11 +118,11 @@ try {
   const southDrag = await getSnapshot(page);
   assert(southDrag.state.observerLatitudeDeg < -50, "Dragging up should move the observer toward the south pole");
   approx(southDrag.state.observerLongitudeDeg, 0, 0.5, "south-drag longitude");
-  approx(
-    southDrag.state.schematic.viewerTurnYaw,
-    baseline.state.schematic.viewerTurnYaw,
-    0.03,
-    "viewer heading should stay fixed relative to the local horizon",
+  approxVec(
+    southDrag.state.surfaceForwardWorld,
+    baseline.state.surfaceForwardWorld,
+    0.02,
+    "viewer world forward should remain stable during latitude drag",
   );
   assert(
     southDrag.state.binarySimulationDays > baseline.state.binarySimulationDays,
@@ -161,6 +168,12 @@ try {
   assert(
     poleWrap.state.observerLatitudeTravelDeg > 120,
     `Pole-wrap travel latitude should advance beyond 90 deg, got ${poleWrap.state.observerLatitudeTravelDeg}`,
+  );
+  approxVec(
+    poleWrap.state.surfaceForwardWorld,
+    directLat.state.surfaceForwardWorld,
+    0.03,
+    "viewer world forward should remain stable across pole crossing",
   );
   approx(poleWrap.state.observerLongitudeDeg, expectedPoleWrap.longitudeDeg, 0.8, "pole-wrap longitude");
   assert(
