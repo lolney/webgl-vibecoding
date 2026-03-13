@@ -2,6 +2,7 @@ import * as THREE from "three";
 
 export const binaryDefaultStartHour = 6.0;
 export const binaryDefaultSimulationDays = 85.35;
+export const binaryDefaultStartupPresetKey = "relay-pre-sunset";
 export const binaryTimeMultipliers = [1, 2, 4, 8, 16];
 
 export const binaryPresets = [
@@ -319,8 +320,10 @@ export function normalizeObserverCoordinates(latitudeDeg = 0, longitudeDeg = 0) 
 }
 
 export function resolveInitialBinaryState(urlState) {
+  const useStartupPreset = !urlState.scene && !urlState.preset;
+  const startupPreset = findBinaryPreset(binaryDefaultStartupPresetKey);
   const preset = findBinaryPreset(urlState.preset);
-  const presetState = preset?.state || {};
+  const presetState = preset?.state || (useStartupPreset ? (startupPreset?.state || {}) : {});
   const rawHour = urlState.binaryHour ?? presetState.binaryDayHours ?? binaryDefaultStartHour;
   const rawLatitudeInput = urlState.binaryLat ?? presetState.latitudeDeg ?? 0;
   const rawLongitudeInput = urlState.binaryLon ?? presetState.longitudeDeg ?? 0;
@@ -330,7 +333,7 @@ export function resolveInitialBinaryState(urlState) {
     rawLongitudeInput,
   );
   return {
-    presetKey: preset?.key || "",
+    presetKey: preset?.key || (useStartupPreset ? (startupPreset?.key || "") : ""),
     binaryDayHours,
     binarySimulationDays: Number.isFinite(urlState.binaryHour)
       ? binaryDefaultSimulationDays + ((urlState.binaryHour - binaryDefaultStartHour) / 24)
@@ -343,7 +346,7 @@ export function resolveInitialBinaryState(urlState) {
     observerLongitudeDeg: observerCoords.longitudeDeg,
     cinematic: urlState.cinematic || Boolean(presetState.cinematic),
     diagnosticsVisible: urlState.diagnostics,
-    scene: urlState.scene || preset?.scene || "clocktower",
+    scene: urlState.scene || preset?.scene || (useStartupPreset ? (startupPreset?.scene || "clocktower") : "clocktower"),
     orbitView: presetState.orbitView || null,
     surfacePitch: Number.isFinite(presetState.surfacePitch) ? presetState.surfacePitch : null,
   };

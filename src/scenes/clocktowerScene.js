@@ -1,7 +1,7 @@
 export const clocktowerScene = {
   key: "clocktower",
   label: "Clocktower",
-  menuLabel: "Clocktower (Default)",
+  menuLabel: "Clocktower",
   controls: {
     minDistance: 2.8,
     maxDistance: 18.0,

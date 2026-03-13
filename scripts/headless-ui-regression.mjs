@@ -125,11 +125,12 @@ try {
 
   await desktopPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
   await desktopPage.waitForTimeout(1600);
-  const clocktower = await getUiState(desktopPage);
-  assert(clocktower.scene === "clocktower", "Clocktower should be the default scene");
-  assert(clocktower.presetDisplay === "none", "Clocktower preset chooser should be hidden");
-  assert(clocktower.timeDisplay === "none", "Clocktower time indicator should be hidden");
-  assert(clocktower.timeRateDisplay === "none", "Clocktower time multiplier should be hidden");
+  const startup = await getUiState(desktopPage);
+  assert(startup.scene === "binaryTwilightSurface", "Twilight relay should be the default scene");
+  assert(startup.debug?.activePresetKey === "relay-pre-sunset", `Startup preset mismatch: ${startup.debug?.activePresetKey}`);
+  assert(startup.presetDisplay !== "none", "Twilight relay should show preset chooser");
+  assert(startup.timeDisplay !== "none", "Twilight relay should show time indicator");
+  assert(startup.timeRateDisplay !== "none", "Twilight relay should show time multiplier");
 
   await desktopPage.click("#audioToggle");
   await desktopPage.waitForTimeout(300);
@@ -181,7 +182,7 @@ try {
 
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const mobileCases = [
-    { route: `http://127.0.0.1:${port}/`, slug: "mobile-clocktower" },
+    { route: `http://127.0.0.1:${port}/`, slug: "mobile-relay-pre-sunset" },
     { route: `http://127.0.0.1:${port}/?scene=binaryExternal&preset=external-wide`, slug: "mobile-external-wide" },
     { route: `http://127.0.0.1:${port}/?scene=binarySurface&preset=surface-sunrise`, slug: "mobile-surface-sunrise" },
   ];
@@ -216,7 +217,7 @@ try {
 
   console.log("UI regression OK.");
   console.log(JSON.stringify({
-    clocktower,
+    startup,
     external,
     surface,
     routeReloadState,
