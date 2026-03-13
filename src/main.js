@@ -878,6 +878,8 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
       uniforms: {
         uColor: { value: new THREE.Color(coreColor) },
         uIntensity: { value: 1.0 },
+        uHorizonClip: { value: -1.1 },
+        uClipFeather: { value: 0.014 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -889,13 +891,17 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
       fragmentShader: `
         uniform vec3 uColor;
         uniform float uIntensity;
+        uniform float uHorizonClip;
+        uniform float uClipFeather;
         varying vec2 vUv;
         void main() {
           vec2 p = vUv - 0.5;
           float d = length(p);
           float disc = smoothstep(0.5, 0.0, d);
           float edge = smoothstep(0.5, 0.42, d) * 0.22;
-          float a = clamp(disc + edge, 0.0, 1.0);
+          float clipY = uHorizonClip * 0.5;
+          float horizonMask = smoothstep(clipY - uClipFeather, clipY + uClipFeather, p.y);
+          float a = clamp(disc + edge, 0.0, 1.0) * horizonMask;
           gl_FragColor = vec4(uColor * (disc * 1.15 + edge) * uIntensity, a);
         }
       `,
@@ -915,6 +921,8 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
         uColor: { value: new THREE.Color(glowColor) },
         uStrength: { value: 1.0 },
         uIntensity: { value: 1.0 },
+        uHorizonClip: { value: -1.1 },
+        uClipFeather: { value: 0.028 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -927,13 +935,17 @@ function makeSurfaceSun(coreColor, glowColor, coreSize, glowSize) {
         uniform vec3 uColor;
         uniform float uStrength;
         uniform float uIntensity;
+        uniform float uHorizonClip;
+        uniform float uClipFeather;
         varying vec2 vUv;
         void main() {
           vec2 p = vUv - 0.5;
           float d = length(p);
           float core = smoothstep(0.18, 0.0, d);
           float halo = smoothstep(0.52, 0.0, d) * 0.7;
-          float a = (core + halo) * uStrength;
+          float clipY = uHorizonClip * 0.5;
+          float horizonMask = smoothstep(clipY - uClipFeather, clipY + uClipFeather, p.y);
+          float a = (core + halo) * uStrength * horizonMask;
           gl_FragColor = vec4(uColor * (core * 1.4 + halo) * uIntensity, a);
         }
       `,

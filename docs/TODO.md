@@ -54,6 +54,12 @@
 
 - [ ] Next-level backlog:
   - [ ] Rendering realism upgrades
+    - [ ] Horizon rendering phases
+      - [x] H1: geometric disc / horizon intersection
+      - [x] H2: source radiance through atmosphere
+      - [ ] H3: atmospheric sky integration around the horizon
+      - [ ] H4: surface BRDF and horizon reflections
+      - [ ] H5: post-optical glare and diffraction
     - [x] Multi-order atmospheric scattering approximation
     - [x] True volumetric participating media for stars, moonlight, and clocktower beams
     - [x] Better ocean BRDF and reflected-sky integration

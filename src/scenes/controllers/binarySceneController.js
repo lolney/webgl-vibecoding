@@ -332,8 +332,8 @@ export function updateBinaryScene(ctx, frame) {
       surfaceFarOcean.material.uniforms.alpha.value = aerialPerspective.surface.farAlpha;
     }
 
-    const primaryDiscVisible = primary.altitudeDeg > -orbit.primaryAngularRadiusDeg;
-    const secondaryDiscVisible = secondary.altitudeDeg > -orbit.secondaryAngularRadiusDeg;
+    const primaryDiscVisible = primary.geometricVisibleFactor > 0;
+    const secondaryDiscVisible = secondary.geometricVisibleFactor > 0;
     surfaceSunA.group.visible = primaryDiscVisible;
     surfaceSunB.group.visible = secondaryDiscVisible;
     surfaceBeamA.visible = false;
@@ -347,10 +347,12 @@ export function updateBinaryScene(ctx, frame) {
       surfaceSunA.group.lookAt(camera.position);
       surfaceSunA.core.material.uniforms.uColor.value.copy(primary.apparentColor);
       surfaceSunA.core.material.uniforms.uIntensity.value = primary.discIntensity;
+      surfaceSunA.core.material.uniforms.uHorizonClip.value = primary.horizonClipRatio;
       surfaceSunA.glow.visible = true;
       surfaceSunA.glow.material.uniforms.uColor.value.copy(primary.apparentColor);
       surfaceSunA.glow.material.uniforms.uStrength.value = primary.haloStrength;
       surfaceSunA.glow.material.uniforms.uIntensity.value = 0.9 + primary.horizonFactor * 0.35;
+      surfaceSunA.glow.material.uniforms.uHorizonClip.value = primary.horizonClipRatio;
       surfaceSunA.group.scale.setScalar(primary.discScale);
 
       if (volumetrics.primaryShaftStrength > 0.015) {
@@ -397,10 +399,12 @@ export function updateBinaryScene(ctx, frame) {
       surfaceSunB.group.lookAt(camera.position);
       surfaceSunB.core.material.uniforms.uColor.value.copy(secondary.apparentColor);
       surfaceSunB.core.material.uniforms.uIntensity.value = secondary.discIntensity;
+      surfaceSunB.core.material.uniforms.uHorizonClip.value = secondary.horizonClipRatio;
       surfaceSunB.glow.visible = true;
       surfaceSunB.glow.material.uniforms.uColor.value.copy(secondary.apparentColor);
       surfaceSunB.glow.material.uniforms.uStrength.value = secondary.haloStrength;
       surfaceSunB.glow.material.uniforms.uIntensity.value = 0.8 + secondary.horizonFactor * 0.28;
+      surfaceSunB.glow.material.uniforms.uHorizonClip.value = secondary.horizonClipRatio;
       surfaceSunB.group.scale.setScalar(secondary.discScale * 0.9);
 
       if (volumetrics.secondaryShaftStrength > 0.015) {
@@ -533,6 +537,8 @@ export function updateBinaryScene(ctx, frame) {
     reflectedLightFactor,
     primaryAzimuthDeg: primary.azimuthDeg,
     secondaryAzimuthDeg: secondary.azimuthDeg,
+    primaryAngularRadiusDeg: orbit.primaryAngularRadiusDeg,
+    secondaryAngularRadiusDeg: orbit.secondaryAngularRadiusDeg,
     schematic: {
       starA: [orbit.starAPosition.x, orbit.starAPosition.z],
       starB: [orbit.starBPosition.x, orbit.starBPosition.z],

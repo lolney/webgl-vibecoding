@@ -87,6 +87,31 @@ function schlickFresnel(cosTheta, f0 = 0.02) {
   return f0 + (1 - f0) * Math.pow(m, 5);
 }
 
+function visibleDiscFraction(altitude, angularRadius) {
+  const safeRadius = Math.max(1e-6, angularRadius);
+  if (altitude >= safeRadius) return 1;
+  if (altitude <= -safeRadius) return 0;
+  const normalizedHeight = THREE.MathUtils.clamp(altitude / safeRadius, -1, 1);
+  return (
+    Math.acos(-normalizedHeight)
+      + normalizedHeight * Math.sqrt(Math.max(0, 1 - normalizedHeight * normalizedHeight))
+  ) / Math.PI;
+}
+
+function integratedDiscExposure(altitude, angularRadius, sampleCount = 24) {
+  const safeRadius = Math.max(1e-6, angularRadius);
+  let totalWeight = 0;
+  let directWeight = 0;
+  for (let i = 0; i < sampleCount; i += 1) {
+    const y = (((i + 0.5) / sampleCount) * 2) - 1;
+    const rowWeight = Math.sqrt(Math.max(0, 1 - y * y));
+    const sampleAltitude = altitude + (y * safeRadius);
+    totalWeight += rowWeight;
+    directWeight += rowWeight * Math.max(0, Math.sin(sampleAltitude));
+  }
+  return totalWeight > 0 ? directWeight / totalWeight : 0;
+}
+
 function reflectLocal(lightDir, normal = new THREE.Vector3(0, 1, 0)) {
   return lightDir.clone().negate().reflect(normal).normalize();
 }
@@ -395,16 +420,19 @@ function solarState({
   altitude,
   azimuth,
   localDir,
+  angularRadius,
   sourceModel,
   baseColor,
   haloBoost = 1,
 }) {
   const altitudeDeg = THREE.MathUtils.radToDeg(altitude);
+  const angularRadiusDeg = THREE.MathUtils.radToDeg(angularRadius);
   const airMass = airMassFromAltitude(altitude);
   const transmittance = transmittanceFromAirMass(airMass);
   const apparentColor = apparentSolarColor(baseColor, transmittance);
-  const visibleFactor = smoothstep(-4.5, 2.0, altitudeDeg);
-  const directFactor = clamp01(Math.sin(Math.max(0, altitude)));
+  const geometricVisibleFactor = visibleDiscFraction(altitude, angularRadius);
+  const visibleFactor = geometricVisibleFactor;
+  const directFactor = integratedDiscExposure(altitude, angularRadius);
   const horizonFactor = clamp01(1 - smoothstep(0, 0.78, directFactor));
   const scatterFactor = visibleFactor * (0.28 + horizonFactor * 0.72);
   const mieFactor = visibleFactor * (0.22 + horizonFactor * 1.1) * haloBoost;
@@ -423,6 +451,8 @@ function solarState({
   return {
     altitude,
     altitudeDeg,
+    angularRadius,
+    angularRadiusDeg,
     azimuth,
     azimuthDeg: THREE.MathUtils.radToDeg(azimuth),
     localDir,
@@ -430,6 +460,7 @@ function solarState({
     transmittance,
     transmittanceLuma,
     apparentColor,
+    geometricVisibleFactor,
     visibleFactor,
     directFactor,
     directIlluminanceLux,
@@ -437,6 +468,7 @@ function solarState({
     scatterFactor: scatterFactor * sourceModel.atmosphereScatterScale,
     mieFactor: mieFactor * sourceModel.atmosphereScatterScale,
     discScale: 0.96 + horizonFactor * 0.5,
+    horizonClipRatio: THREE.MathUtils.clamp(-altitude / Math.max(1e-6, angularRadius), -1, 1),
     discLuminance,
     haloLuminance,
     discIntensity: discLuminance,
@@ -451,6 +483,7 @@ export function computeLightingState(orbit) {
     altitude: orbit.primaryAltitude,
     azimuth: orbit.primaryAzimuth,
     localDir: orbit.primaryLocalDir,
+    angularRadius: orbit.primaryAngularRadius,
     sourceModel: binaryLightModel.primaryStar,
     baseColor: PRIMARY_BASE,
     haloBoost: 1.0,
@@ -459,6 +492,7 @@ export function computeLightingState(orbit) {
     altitude: orbit.secondaryAltitude,
     azimuth: orbit.secondaryAzimuth,
     localDir: orbit.secondaryLocalDir,
+    angularRadius: orbit.secondaryAngularRadius,
     sourceModel: binaryLightModel.secondaryStar,
     baseColor: SECONDARY_BASE,
     haloBoost: 0.74,
@@ -534,6 +568,10 @@ export function computeLightingState(orbit) {
       secondaryDiscLuminance: secondary.discLuminance,
       primaryHaloLuminance: primary.haloLuminance,
       secondaryHaloLuminance: secondary.haloLuminance,
+      primaryAngularRadiusDeg: primary.angularRadiusDeg,
+      secondaryAngularRadiusDeg: secondary.angularRadiusDeg,
+      primaryDiscVisibleFraction: primary.geometricVisibleFactor,
+      secondaryDiscVisibleFraction: secondary.geometricVisibleFactor,
     },
     transport,
     illumination: {
@@ -617,6 +655,12 @@ export function lightingDebugState(lighting) {
     secondaryDiscLuminance: Number(lighting.sourceUnits.secondaryDiscLuminance.toFixed(3)),
     primaryHaloLuminance: Number(lighting.sourceUnits.primaryHaloLuminance.toFixed(3)),
     secondaryHaloLuminance: Number(lighting.sourceUnits.secondaryHaloLuminance.toFixed(3)),
+    primaryAngularRadiusDeg: Number(lighting.sourceUnits.primaryAngularRadiusDeg.toFixed(4)),
+    secondaryAngularRadiusDeg: Number(lighting.sourceUnits.secondaryAngularRadiusDeg.toFixed(4)),
+    primaryDiscVisibleFraction: Number(lighting.sourceUnits.primaryDiscVisibleFraction.toFixed(4)),
+    secondaryDiscVisibleFraction: Number(lighting.sourceUnits.secondaryDiscVisibleFraction.toFixed(4)),
+    primaryHorizonClipRatio: Number(lighting.primary.horizonClipRatio.toFixed(4)),
+    secondaryHorizonClipRatio: Number(lighting.secondary.horizonClipRatio.toFixed(4)),
     primaryTransmittance: Number(lighting.transport.primaryTransmittance.toFixed(4)),
     secondaryTransmittance: Number(lighting.transport.secondaryTransmittance.toFixed(4)),
     primaryReflectionGain: Number(lighting.surfaceOptics.primaryReflectionGain.toFixed(4)),

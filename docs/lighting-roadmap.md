@@ -5,8 +5,10 @@
 Upgrade the demoscene from stylized lighting toward a more principled physically based model, with emphasis on:
 
 - atmospheric scattering
+- geometric horizon clipping for luminous star discs
 - sunrise/sunset color accuracy
 - volumetric lighting
+- post-optical glare and diffraction for compact bright emitters
 - physically meaningful emissive stars and moonlight
 - water/air interaction that stays readable in both artistic and debug views
 
@@ -14,6 +16,7 @@ Upgrade the demoscene from stylized lighting toward a more principled physically
 
 - One simulation state should drive all lighting inputs.
 - Local sky color, sun disc intensity, fog, and reflections should derive from star altitude and optical path length, not scene-specific hacks.
+- Stars should disappear only because of geometry, extinction, occlusion, or optics. No presentation-driven fades.
 - Effects should remain tunable for art direction, but the base model should be physically coherent.
 - Every lighting stage needs headless validation cases with screenshots and debug dumps.
 
@@ -44,6 +47,58 @@ This roadmap therefore distinguishes between:
 - physically rigorous: closer to radiometric and atmospheric correctness
 
 The target for this project should be physically plausible by default, with selected rigorous pieces where the visual payoff is high.
+
+## Horizon Rendering Phases
+
+These phases specifically cover how luminous star discs behave near the horizon in the relay and surface scenes.
+
+### H1. Geometric disc / horizon intersection
+
+- Model disc visibility from apparent angular radius and horizon intersection.
+- Render partial discs when only part of the source is above the horizon.
+- Remove any altitude-only fade logic.
+- Status:
+  - implemented for relay and surface star discs
+
+### H2. Source radiance through atmosphere
+
+- Derive direct source brightness from:
+  - apparent angular area
+  - atmospheric transmittance
+  - visible disc fraction
+- Distinguish:
+  - direct disc radiance
+  - in-scattered halo radiance
+  - surface illumination
+- Status:
+  - implemented in first-order form
+- Remaining gap:
+  - optical depth is still an approximation and not yet integrated along the full view ray for every source sample
+
+### H3. Atmospheric sky integration around the horizon
+
+- Replace simple horizon shaping with a sky model driven by:
+  - view optical depth
+  - sun-ray optical depth
+  - Rayleigh and aerosol scattering
+- Required behavior:
+  - twilight emerges from atmosphere transport
+  - low-angle sources stay embedded in a coherent scattering field
+  - relay transitions read as a sky event, not a sprite transition
+
+### H4. Surface BRDF and horizon reflections
+
+- Let low-angle reflections emerge from:
+  - Fresnel response
+  - rough-surface glitter
+  - reflected sky radiance
+- Remove remaining painted-looking reflection strips near the horizon.
+
+### H5. Post-optical glare and diffraction
+
+- Treat bloom, glare, and diffraction as camera/optics effects after radiance formation.
+- Feed them from bright source masks and atmospheric energy, not source alpha hacks.
+- Keep them subordinate to the physical visibility model.
 
 ## Phase 1: Photometric Cleanup
 
