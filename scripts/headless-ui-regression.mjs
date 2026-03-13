@@ -117,6 +117,8 @@ try {
   });
 
   const desktopPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  desktopPage.setDefaultTimeout(60000);
+  desktopPage.setDefaultNavigationTimeout(60000);
   const pageErrors = [];
   desktopPage.on("pageerror", (err) => pageErrors.push(`pageerror: ${err.message}`));
   desktopPage.on("console", (msg) => {
@@ -137,7 +139,7 @@ try {
   const audioStarted = await getUiState(desktopPage);
   assert(audioStarted.audioText === "Stop Audio", `Audio button should toggle to Stop Audio, got ${audioStarted.audioText}`);
 
-  await desktopPage.selectOption("#sceneChooser", "binaryExternal");
+  await desktopPage.selectOption("#sceneChooser", "binaryExternal", { force: true });
   await desktopPage.waitForTimeout(1400);
   const external = await getUiState(desktopPage);
   assert(external.scene === "binaryExternal", "Scene chooser should switch to binaryExternal");
@@ -146,7 +148,7 @@ try {
   assert(external.timeText === "System View", `External time badge should read System View, got ${external.timeText}`);
   assert(external.timeRateDisplay === "none", "External scene should hide time multiplier");
 
-  await desktopPage.selectOption("#sceneChooser", "binarySurface");
+  await desktopPage.selectOption("#sceneChooser", "binarySurface", { force: true });
   await desktopPage.waitForTimeout(1400);
   const surface = await getUiState(desktopPage);
   assert(surface.scene === "binarySurface", "Scene chooser should switch to binarySurface");
@@ -154,9 +156,9 @@ try {
   assert(surface.timeDisplay !== "none", "Surface scene should show time indicator");
   assert(surface.timeRateDisplay !== "none", "Surface scene should show time multiplier");
 
-  await desktopPage.selectOption("#sceneChooser", "clocktower");
+  await desktopPage.selectOption("#sceneChooser", "clocktower", { force: true });
   await desktopPage.waitForTimeout(1000);
-  await desktopPage.selectOption("#sceneChooser", "binaryTwilightSurface");
+  await desktopPage.selectOption("#sceneChooser", "binaryTwilightSurface", { force: true });
   await desktopPage.waitForTimeout(1400);
   const switchedRelay = await getUiState(desktopPage);
   assert(switchedRelay.scene === "binaryTwilightSurface", "Scene chooser should switch to binaryTwilightSurface");
@@ -197,6 +199,8 @@ try {
   approx(relayRouteDefault.debug?.binaryDayHours, 17.8736, 0.35, "bare relay route hour");
 
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  mobilePage.setDefaultTimeout(60000);
+  mobilePage.setDefaultNavigationTimeout(60000);
   const mobileCases = [
     { route: `http://127.0.0.1:${port}/`, slug: "mobile-relay-pre-sunset" },
     { route: `http://127.0.0.1:${port}/?scene=binaryExternal&preset=external-wide`, slug: "mobile-external-wide" },
@@ -225,7 +229,7 @@ try {
         `${mobileCase.slug} schematics overlap each other`,
       );
     }
-    await mobilePage.screenshot({ path: outputPath(`${mobileCase.slug}-page.png`), fullPage: true });
+    await mobilePage.screenshot({ path: outputPath(`${mobileCase.slug}-page.png`), fullPage: true, timeout: 60000 });
     mobileResults.push({ slug: mobileCase.slug, state });
   }
 

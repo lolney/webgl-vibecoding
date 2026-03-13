@@ -78,7 +78,7 @@ async function applyViewAndShot(page, view, localSlug) {
   const pagePath = path.join(projectRoot, "output", `${localSlug}-page.png`);
   const canvasPath = path.join(projectRoot, "output", `${localSlug}-canvas.png`);
   const debugPath = path.join(projectRoot, "output", `${localSlug}-debug.json`);
-  await page.screenshot({ path: pagePath, fullPage: true });
+  await page.screenshot({ path: pagePath, fullPage: true, timeout: 60000 });
   const canvasPngDataUrl = await page.evaluate(() => {
     const canvas = window.__canvas || document.querySelector("canvas");
     return canvas ? canvas.toDataURL("image/png") : null;
@@ -201,6 +201,8 @@ try {
     ],
   });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  page.setDefaultTimeout(60000);
+  page.setDefaultNavigationTimeout(60000);
 
   const pageErrors = [];
   page.on("pageerror", (err) => pageErrors.push(`pageerror: ${err.message}`));

@@ -57,7 +57,7 @@
     - [ ] Horizon rendering phases
       - [x] H1: geometric disc / horizon intersection
       - [x] H2: source radiance through atmosphere
-      - [ ] H3: atmospheric sky integration around the horizon
+      - [x] H3: atmospheric sky integration around the horizon
       - [ ] H4: surface BRDF and horizon reflections
       - [ ] H5: post-optical glare and diffraction
     - [x] Multi-order atmospheric scattering approximation

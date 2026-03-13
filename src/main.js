@@ -699,6 +699,10 @@ const surfaceSky = new THREE.Mesh(
       uMultiScatterStrength: { value: 0.1 },
       uZenithOpticalDepth: { value: 0.46 },
       uHorizonOpticalDepth: { value: 5.2 },
+      uZenithRayleighDepth: { value: 0.36 },
+      uHorizonRayleighDepth: { value: 3.8 },
+      uZenithMieDepth: { value: 0.1 },
+      uHorizonMieDepth: { value: 1.4 },
       uScatterStrengthA: { value: 0.0 },
       uScatterStrengthB: { value: 0.0 },
       uMieStrengthA: { value: 0.0 },
@@ -730,46 +734,65 @@ const surfaceSky = new THREE.Mesh(
       uniform float uMultiScatterStrength;
       uniform float uZenithOpticalDepth;
       uniform float uHorizonOpticalDepth;
+      uniform float uZenithRayleighDepth;
+      uniform float uHorizonRayleighDepth;
+      uniform float uZenithMieDepth;
+      uniform float uHorizonMieDepth;
       uniform float uScatterStrengthA;
       uniform float uScatterStrengthB;
       uniform float uMieStrengthA;
       uniform float uMieStrengthB;
       varying vec3 vLocalDir;
+
+      float henyeyGreenstein(float cosTheta, float g) {
+        float gg = g * g;
+        float denom = pow(max(1.0 + gg - 2.0 * g * cosTheta, 1e-3), 1.5);
+        return (1.0 - gg) / (4.0 * 3.14159265 * denom);
+      }
+
       void main() {
         vec3 dir = normalize(vLocalDir);
-        float h = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
-        float muA = max(dot(dir, normalize(uSunDirA)), 0.0);
-        float muB = max(dot(dir, normalize(uSunDirB)), 0.0);
-        float rayleighPhaseA = 0.75 * (1.0 + muA * muA);
-        float rayleighPhaseB = 0.75 * (1.0 + muB * muB);
-        float miePhaseA = pow(muA, mix(10.0, 28.0, 1.0 - uHaze));
-        float miePhaseB = pow(muB, mix(12.0, 26.0, 1.0 - uHaze));
-        float horizon = pow(1.0 - h, 1.4);
-        float density = mix(1.05, 2.5, horizon) * mix(0.75, 1.45, uHaze);
-        float opticalDepth = mix(uHorizonOpticalDepth, uZenithOpticalDepth, pow(h, 0.72));
-        float multiScatterPhase = 1.0 - exp(-opticalDepth * (0.36 + uHaze * 0.22));
-        float forwardGlow = max(muA, muB);
+        float up = clamp(dir.y, 0.0, 1.0);
+        float h = clamp(up * 0.5 + 0.5, 0.0, 1.0);
+        float muA = clamp(dot(dir, normalize(uSunDirA)), -1.0, 1.0);
+        float muB = clamp(dot(dir, normalize(uSunDirB)), -1.0, 1.0);
+        float rayleighPhaseA = (3.0 / (16.0 * 3.14159265)) * (1.0 + muA * muA);
+        float rayleighPhaseB = (3.0 / (16.0 * 3.14159265)) * (1.0 + muB * muB);
+        float mieG = mix(0.6, 0.82, uHaze);
+        float miePhaseA = henyeyGreenstein(muA, mieG);
+        float miePhaseB = henyeyGreenstein(muB, mieG);
+        float horizon = pow(1.0 - up, 1.35);
+        float rayleighDepth = mix(uHorizonRayleighDepth, uZenithRayleighDepth, pow(up, 0.72));
+        float mieDepth = mix(uHorizonMieDepth, uZenithMieDepth, pow(up, 0.8));
+        float opticalDepth = mix(uHorizonOpticalDepth, uZenithOpticalDepth, pow(up, 0.75));
+        float rayleighIntegral = 1.0 - exp(-rayleighDepth * (0.18 + uHaze * 0.04));
+        float mieIntegral = 1.0 - exp(-mieDepth * (0.12 + uHaze * 0.08));
+        float multiScatterPhase = 1.0 - exp(-(rayleighDepth * 0.24 + mieDepth * 0.16));
+        float forwardGlow = max(max(muA, muB), 0.0);
+        vec3 viewTransmittance = exp(-(
+          vec3(0.16, 0.15, 0.13) * rayleighDepth
+          + vec3(0.08, 0.08, 0.075) * mieDepth
+        ));
 
-        vec3 nightBase = mix(uNightHorizon, uNightZenith, pow(h, 0.72));
-        vec3 dayBase = mix(uHorizonColor, uZenithColor, pow(h, 0.7));
+        vec3 nightBase = mix(uNightHorizon, uNightZenith, pow(up, 0.72)) * (0.28 + uNightStrength * 0.72);
+        vec3 preintegrated = mix(uHorizonColor, uZenithColor, pow(up, 0.74))
+          * (0.08 + uDayStrength * 0.18 + uTwilightStrength * 0.12);
         vec3 scatter = uRayleighColor * (
           rayleighPhaseA * uScatterStrengthA +
           rayleighPhaseB * uScatterStrengthB
-        ) * density * (0.45 + 0.55 * h);
+        ) * rayleighIntegral * (0.62 + up * 0.38);
         vec3 mie = uMieColorA * miePhaseA * uMieStrengthA
           + uMieColorB * miePhaseB * uMieStrengthB;
+        mie *= mieIntegral * (0.32 + horizon * 0.68);
         vec3 multiScatter = uMultiScatterColor
           * uMultiScatterStrength
           * multiScatterPhase
-          * mix(1.1, 0.74, h)
+          * mix(1.18, 0.76, up)
           * mix(0.88, 1.18, forwardGlow);
-        vec3 twilightBoost = uHorizonColor * horizon * (uTwilightStrength * 0.46);
-        float waterlineBand = smoothstep(0.0, 0.05, h) * (1.0 - smoothstep(0.05, 0.14, h));
-
-        vec3 litSky = dayBase + scatter + mie + multiScatter + twilightBoost;
-        vec3 col = mix(nightBase, litSky, clamp(uDayStrength + uTwilightStrength * 0.72, 0.0, 1.0));
-        col *= 1.0 - waterlineBand * 0.24;
-        col = mix(col, nightBase, uNightStrength * smoothstep(0.0, 0.35, 1.0 - h) * 0.18);
+        vec3 twilightBoost = uMultiScatterColor * horizon * (uTwilightStrength * 0.18 + opticalDepth * 0.01);
+        vec3 col = nightBase + (scatter + mie + multiScatter + twilightBoost + preintegrated) * viewTransmittance;
+        float waterlineBand = smoothstep(0.0, 0.05, up) * (1.0 - smoothstep(0.05, 0.14, up));
+        col *= 1.0 - waterlineBand * 0.18;
         gl_FragColor = vec4(col, 1.0);
       }
     `,

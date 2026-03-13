@@ -38,7 +38,7 @@ export const binarySystemConfigs = {
     planetYearDays: 220,
     axialTiltRad: 0.1804539619818235,
     starA: {
-      radius: 1.18,
+      radius: 0.28,
       luminosity: 0.92,
       orbitRadius: 4.093209271964608,
       verticalAmplitude: 0.07971684934088819,
@@ -47,7 +47,7 @@ export const binarySystemConfigs = {
       phaseOffset: 0.0,
     },
     starB: {
-      radius: 0.98,
+      radius: 0.32,
       luminosity: 0.55,
       orbitRadius: 4.9564868641699,
       verticalAmplitude: 0.25636704019781564,

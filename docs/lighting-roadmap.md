@@ -85,6 +85,11 @@ These phases specifically cover how luminous star discs behave near the horizon 
   - twilight emerges from atmosphere transport
   - low-angle sources stay embedded in a coherent scattering field
   - relay transitions read as a sky event, not a sprite transition
+- Status:
+  - implemented in analytic form for the binary surface and relay scenes
+- Notes:
+  - the current implementation uses transport-driven zenith/horizon reference colors plus per-pixel Rayleigh/Mie depth integration
+  - headless coverage now includes relay-sequence screenshots and scattering-metric assertions
 
 ### H4. Surface BRDF and horizon reflections
 

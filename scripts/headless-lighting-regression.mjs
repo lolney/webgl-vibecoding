@@ -60,6 +60,10 @@ assert(sunset.lighting.skyMultiScatterStrength > night.lighting.skyMultiScatterS
 assert(sunset.lighting.skyMultiScatterStrength > 0.25, "Sunset multi-scatter should remain materially present");
 assert(noon.lighting.skyHorizonOpticalDepth > noon.lighting.skyZenithOpticalDepth, "Horizon optical depth should exceed zenith optical depth");
 assert(sunrise.lighting.skyHorizonOpticalDepth > sunrise.lighting.skyZenithOpticalDepth, "Sunrise horizon optical depth should exceed zenith optical depth");
+assert(sunset.lighting.skyHorizonRayleighDepth > sunset.lighting.skyZenithRayleighDepth, "Sunset horizon Rayleigh depth should exceed zenith");
+assert(sunset.lighting.skyHorizonMieDepth > sunset.lighting.skyZenithMieDepth, "Sunset horizon Mie depth should exceed zenith");
+assert(sunset.lighting.skyRayleighLuminance > night.lighting.skyRayleighLuminance, "Sunset Rayleigh sky luminance should exceed night");
+assert(sunset.lighting.skyMieLuminance > noon.lighting.skyMieLuminance * 0.5, "Sunset Mie luminance should remain materially present");
 assert(noon.lighting.extinctionBucketR < noon.lighting.extinctionBucketG, "Red extinction bucket should stay below green");
 assert(noon.lighting.extinctionBucketG < noon.lighting.extinctionBucketB, "Green extinction bucket should stay below blue");
 assert(sunrise.lighting.waterGlitterBlend > night.lighting.waterGlitterBlend, "Sunrise water glitter should exceed night");
@@ -67,7 +71,7 @@ assert(sunrise.lighting.primaryReflectionGain > night.lighting.primaryReflection
 assert(sunrise.lighting.waterFresnel > noon.lighting.waterFresnel, "Sunrise Fresnel should exceed noon");
 assert(sunrise.lighting.waterSkyReflectionGain > noon.lighting.waterSkyReflectionGain, "Sunrise sky reflection gain should exceed noon");
 assert(sunrise.lighting.primarySpecular > noon.lighting.primarySpecular, "Sunrise primary specular should exceed noon");
-assert(sunset.lighting.primaryTrailGain > noon.lighting.primaryTrailGain, "Sunset primary trail gain should exceed noon");
+assert(sunset.lighting.primaryReflectionGain > noon.lighting.primaryReflectionGain, "Sunset primary reflection gain should exceed noon");
 assert(secondSun.lighting.secondaryTrailGain > secondSun.lighting.primaryTrailGain, "Second-sun preset should bias trail gain toward the visible secondary");
 assert(secondSun.lighting.primarySpecular > secondSun.lighting.secondarySpecular, "Second-sun preset should bias glint toward the aligned star");
 assert(noon.lighting.waterRoughnessFar > noon.lighting.waterRoughnessNear, "Far-water roughness should exceed near-water roughness");
