@@ -154,6 +154,15 @@ try {
   assert(surface.timeDisplay !== "none", "Surface scene should show time indicator");
   assert(surface.timeRateDisplay !== "none", "Surface scene should show time multiplier");
 
+  await desktopPage.selectOption("#sceneChooser", "clocktower");
+  await desktopPage.waitForTimeout(1000);
+  await desktopPage.selectOption("#sceneChooser", "binaryTwilightSurface");
+  await desktopPage.waitForTimeout(1400);
+  const switchedRelay = await getUiState(desktopPage);
+  assert(switchedRelay.scene === "binaryTwilightSurface", "Scene chooser should switch to binaryTwilightSurface");
+  assert(switchedRelay.debug?.activePresetKey === "relay-pre-sunset", `Scene switch should restore relay preset, got ${switchedRelay.debug?.activePresetKey}`);
+  approx(switchedRelay.debug?.binaryDayHours, 17.8736, 0.35, "scene-switch relay hour");
+
   await desktopPage.goto(`http://127.0.0.1:${port}/?scene=binarySurface&preset=surface-sunset&binaryLat=24&binaryLon=30&timeMultiplier=8&cinematic=1`, { waitUntil: "networkidle" });
   await desktopPage.waitForTimeout(1200);
   const routeState = await getUiState(desktopPage);
@@ -179,6 +188,13 @@ try {
   const externalDusk = await getUiState(desktopPage);
   approx(externalDawn.debug?.backgroundLuma, externalDusk.debug?.backgroundLuma, 0.0005, "external background luma invariance");
   approx(externalDawn.debug?.fogDensity, externalDusk.debug?.fogDensity, 0.0005, "external fog density invariance");
+
+  await desktopPage.goto(`http://127.0.0.1:${port}/?scene=binaryTwilightSurface`, { waitUntil: "networkidle" });
+  await desktopPage.waitForTimeout(1200);
+  const relayRouteDefault = await getUiState(desktopPage);
+  assert(relayRouteDefault.scene === "binaryTwilightSurface", "Bare relay route should restore twilight scene");
+  assert(relayRouteDefault.debug?.activePresetKey === "relay-pre-sunset", `Bare relay route preset mismatch: ${relayRouteDefault.debug?.activePresetKey}`);
+  approx(relayRouteDefault.debug?.binaryDayHours, 17.8736, 0.35, "bare relay route hour");
 
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const mobileCases = [
@@ -220,7 +236,9 @@ try {
     startup,
     external,
     surface,
+    switchedRelay,
     routeReloadState,
+    relayRouteDefault,
     externalDawn: externalDawn.debug,
     externalDusk: externalDusk.debug,
     mobileResults,

@@ -3,6 +3,7 @@ export const binarySurfaceScene = {
   label: "Binary Surface POV",
   menuLabel: "Binary System (Planet POV)",
   binarySystemKey: "standardBinary",
+  defaultPreset: "surface-sunrise",
   controls: {
     minDistance: 11.8,
     maxDistance: 13.2,

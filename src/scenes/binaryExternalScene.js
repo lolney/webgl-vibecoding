@@ -3,6 +3,7 @@ export const binaryExternalScene = {
   label: "Binary External",
   menuLabel: "Binary System (External)",
   binarySystemKey: "standardBinary",
+  defaultPreset: "external-wide",
   controls: {
     minDistance: 26.0,
     maxDistance: 56.0,

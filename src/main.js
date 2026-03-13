@@ -2012,17 +2012,21 @@ function applySceneMode(nextSceneKey, options = {}) {
     syncSceneToUrl,
     setCinematic,
   });
+  const activeSceneDef = sceneByKey[activeSceneKey];
+  const scenePresets = getPresetsForScene(activeSceneKey);
+  const defaultPresetAvailable = !activePresetKey
+    && activeSceneDef?.defaultPreset
+    && scenePresets.some((preset) => preset.key === activeSceneDef.defaultPreset);
+  if (defaultPresetAvailable) {
+    applyBinaryPreset(activeSceneDef.defaultPreset, { syncUrl: false });
+  }
   if (isBinarySurfaceScene(activeSceneKey)) {
     surfaceObserverAnchor.set(0, 1.42, 0);
     surfaceViewDistance = 12.4;
-    const orbit = getSurfaceObserverState();
-    aimSurfaceForwardAtPrimary(orbit, -0.03);
-    updateSurfaceCamera(0);
-  } else {
-    const activeSceneDef = sceneByKey[activeSceneKey];
-    const scenePresets = getPresetsForScene(activeSceneKey);
-    if (!activePresetKey && activeSceneDef?.defaultPreset && scenePresets.some((preset) => preset.key === activeSceneDef.defaultPreset)) {
-      applyBinaryPreset(activeSceneDef.defaultPreset, { syncUrl: false });
+    if (!defaultPresetAvailable) {
+      const orbit = getSurfaceObserverState();
+      aimSurfaceForwardAtPrimary(orbit, -0.03);
+      updateSurfaceCamera(0);
     }
   }
   onResize();
