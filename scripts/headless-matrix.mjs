@@ -15,6 +15,7 @@ const cases = [
   ["--scene=binaryExternal", "--preset=external-eclipse-egress", "--name=matrix-external-eclipse-egress"],
   ["--scene=eclipseScene", "--preset=eclipse-totality", "--name=matrix-eclipse-totality"],
   ["--scene=binaryExternal", "--preset=external-conjunction", "--name=matrix-external-conjunction"],
+  ["--scene=binaryTwilightSurface", "--preset=relay-pre-sunset", "--name=matrix-relay-pre-sunset"],
   ["--scene=binarySurface", "--preset=surface-sunrise", "--name=matrix-surface-sunrise"],
   ["--scene=binarySurface", "--preset=surface-noon", "--name=matrix-surface-noon"],
   ["--scene=binarySurface", "--preset=surface-summer-solstice", "--name=matrix-surface-summer-solstice"],

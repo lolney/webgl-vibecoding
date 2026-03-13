@@ -2,6 +2,7 @@ export const eclipseScene = {
   key: "eclipseScene",
   label: "Eclipse Study",
   menuLabel: "Eclipse Study",
+  binarySystemKey: "standardBinary",
   controls: {
     minDistance: 20.0,
     maxDistance: 42.0,

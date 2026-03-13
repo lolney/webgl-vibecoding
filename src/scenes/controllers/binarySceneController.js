@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { computeBinarySimulationState } from "../shared/orbital.js";
 import { computeLightingState, lightingDebugState } from "../shared/lighting.js";
+import { defaultBinarySystemKey } from "../shared/binarySystems.js";
+import { isBinaryExternalScene, isBinarySurfaceScene } from "../shared/sceneFamilies.js";
 
 const EXTERNAL_BACKGROUND = new THREE.Color(0x02050d);
 const EXTERNAL_FOG_COLOR = new THREE.Color(0x071120);
@@ -60,6 +62,7 @@ export function updateBinaryScene(ctx, frame) {
     level,
     cinematicMix,
     activeSceneKey,
+    binarySystemKey = defaultBinarySystemKey,
     binaryDayHours,
     binarySimulationDays,
     observerLatitudeTravelDeg,
@@ -70,15 +73,16 @@ export function updateBinaryScene(ctx, frame) {
     debugView,
   } = frame;
 
-  const isSurfaceScene = activeSceneKey === "binarySurface";
+  const isSurfaceScene = isBinarySurfaceScene(activeSceneKey);
   const isExternalScene = activeSceneKey === "binaryExternal";
   const isEclipseScene = activeSceneKey === "eclipseScene";
-  const isExternalFamily = isExternalScene || isEclipseScene;
+  const isExternalFamily = isBinaryExternalScene(activeSceneKey);
 
   const orbit = computeBinarySimulationState({
     binaryDayHours,
     simulationDays: binarySimulationDays,
     planetOrbitRadius,
+    systemKey: binarySystemKey,
     cameraPosition: camera.position,
     cameraTarget: controls.target,
     observerLatitude: THREE.MathUtils.degToRad(
@@ -504,6 +508,7 @@ export function updateBinaryScene(ctx, frame) {
     dayPhase: orbit.dayPhase,
     seasonDay: orbit.seasonDay,
     seasonPhase: orbit.seasonPhase,
+    binarySystemKey,
     resonanceLabel: orbit.resonanceLabel,
     resonanceStrength: orbit.resonanceStrength,
     resonancePhaseDeg: THREE.MathUtils.radToDeg(orbit.resonancePhase),

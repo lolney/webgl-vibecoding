@@ -12,6 +12,7 @@
     "headless:eclipse-scene": "npm run build && node scripts/headless-eclipse-scene-regression.mjs",
     "headless:clocktower-lighting": "npm run build && node scripts/headless-clocktower-lighting.mjs",
     "headless:resonance": "npm run build && node scripts/headless-resonance-regression.mjs",
+    "headless:relay": "npm run build && node scripts/headless-relay-regression.mjs",
     "headless:latitude": "npm run build && node scripts/headless-latitude-regression.mjs",
     "headless:camera": "npm run build && node scripts/headless-camera-regression.mjs",
     "headless:ui": "npm run build && node scripts/headless-ui-regression.mjs",

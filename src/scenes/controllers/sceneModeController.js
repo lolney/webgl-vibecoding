@@ -1,3 +1,5 @@
+import { isBinaryExternalScene, isBinarySurfaceScene } from "../shared/sceneFamilies.js";
+
 export function applySceneModeInternal(params) {
   const {
     nextSceneKey,
@@ -33,11 +35,11 @@ export function applySceneModeInternal(params) {
   sceneManager.setActive(activeSceneKey);
   const activeSceneDef = sceneByKey[activeSceneKey] || clocktowerScene;
   const isClocktower = activeSceneKey === "clocktower";
-  const isExternalFamily = activeSceneKey === "binaryExternal" || activeSceneKey === "eclipseScene";
+  const isExternalFamily = isBinaryExternalScene(activeSceneKey);
 
   for (const obj of clocktowerObjects) obj.visible = isClocktower;
   for (const obj of binaryObjects) obj.visible = isExternalFamily;
-  surfacePovGroup.visible = activeSceneKey === "binarySurface";
+  surfacePovGroup.visible = isBinarySurfaceScene(activeSceneKey);
   surfaceForeground.visible = false;
   const preset = activeSceneDef.controls || clocktowerScene.controls;
   controls.minDistance = preset.minDistance;
@@ -79,13 +81,13 @@ export function applySceneModeInternal(params) {
     planetMesh.visible = true;
     cloudLayer.visible = true;
     hud.setScene(activeSceneKey);
-  } else {
+  } else if (isBinarySurfaceScene(activeSceneKey)) {
     controls.target.set(0, 4.15, -53.92);
     planetMesh.visible = false;
     cloudLayer.visible = false;
     camera.up.set(0, 1, 0);
     camera.position.set(0, 1.278, -66.8);
-    hud.setScene("binarySurface");
+    hud.setScene(activeSceneKey);
   }
   controls.update();
   if (syncUrl) syncSceneToUrl(activeSceneKey, { pushHistory });

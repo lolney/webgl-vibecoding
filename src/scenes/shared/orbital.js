@@ -1,15 +1,8 @@
 import * as THREE from "three";
+import { defaultBinarySystemKey, getBinarySystemConfig } from "./binarySystems.js";
 
 const TAU = Math.PI * 2;
-const BINARY_ORBIT_PERIOD_DAYS = 32;
-const PLANET_YEAR_DAYS = 220;
-const AXIAL_TILT = THREE.MathUtils.degToRad(18);
-const STAR_A_LUMINOSITY = 1.0;
-const STAR_B_LUMINOSITY = 0.42;
-const RESONANCE_BINARY_CYCLES = 13;
-const RESONANCE_PLANET_CYCLES = 2;
-
-export { PLANET_YEAR_DAYS };
+export const PLANET_YEAR_DAYS = getBinarySystemConfig(defaultBinarySystemKey).planetYearDays;
 
 function smoothstep(edge0, edge1, x) {
   const t = THREE.MathUtils.clamp((x - edge0) / (edge1 - edge0), 0, 1);
@@ -122,6 +115,7 @@ export function computeBinarySimulationState({
   binaryDayHours,
   simulationDays = null,
   planetOrbitRadius,
+  systemKey = defaultBinarySystemKey,
   cameraPosition,
   cameraTarget,
   observerLatitude = 0,
@@ -130,34 +124,45 @@ export function computeBinarySimulationState({
   viewerHeadingYaw = null,
   viewerPitch = 0,
 }) {
-  const starARadius = 1.3;
-  const starBRadius = 1.05;
+  const system = getBinarySystemConfig(systemKey);
+  const {
+    binaryOrbitPeriodDays,
+    planetYearDays,
+    axialTiltRad,
+    starA,
+    starB,
+    binaryAngleOffset,
+    planetAngleOffset,
+    resonanceCycles,
+  } = system;
+  const starARadius = starA.radius;
+  const starBRadius = starB.radius;
   const planetRadius = 0.65;
   const dayPhase = THREE.MathUtils.euclideanModulo(binaryDayHours, 24) / 24;
   const localHourAngle = (dayPhase - 0.5) * TAU + observerLongitude;
   const simDays = Number.isFinite(simulationDays) ? simulationDays : (binaryDayHours / 24);
-  const seasonDay = THREE.MathUtils.euclideanModulo(simDays, PLANET_YEAR_DAYS);
-  const seasonPhase = seasonDay / PLANET_YEAR_DAYS;
+  const seasonDay = THREE.MathUtils.euclideanModulo(simDays, planetYearDays);
+  const seasonPhase = seasonDay / planetYearDays;
 
   // One continuous model drives all motion: slow orbital progression, fast planetary spin.
-  const binaryAngle = simDays * (TAU / BINARY_ORBIT_PERIOD_DAYS) + 0.52;
-  const planetAngle = simDays * (TAU / PLANET_YEAR_DAYS) + 0.7;
+  const binaryAngle = simDays * (TAU / binaryOrbitPeriodDays) + binaryAngleOffset;
+  const planetAngle = simDays * (TAU / planetYearDays) + planetAngleOffset;
   const resonancePhase = THREE.MathUtils.euclideanModulo(
-    (binaryAngle * RESONANCE_PLANET_CYCLES) - (planetAngle * RESONANCE_BINARY_CYCLES),
+    (binaryAngle * resonanceCycles.planet) - (planetAngle * resonanceCycles.binary),
     TAU,
   );
   const resonanceStrength = 0.5 + 0.5 * Math.cos(resonancePhase);
   const resonanceWindow = smoothstep(0.74, 0.98, resonanceStrength);
 
   const starAPosition = new THREE.Vector3(
-    Math.cos(binaryAngle) * 4.1,
-    Math.sin(binaryAngle) * 0.22,
-    Math.sin(binaryAngle) * 4.1,
+    Math.cos(binaryAngle + starA.phaseOffset) * starA.orbitRadius,
+    Math.sin(binaryAngle * starA.verticalFrequency + starA.verticalPhase) * starA.verticalAmplitude,
+    Math.sin(binaryAngle + starA.phaseOffset) * starA.orbitRadius,
   );
   const starBPosition = new THREE.Vector3(
-    -Math.cos(binaryAngle) * 4.9,
-    -Math.sin(binaryAngle * 1.07) * 0.18,
-    -Math.sin(binaryAngle) * 4.9,
+    Math.cos(binaryAngle + starB.phaseOffset) * starB.orbitRadius,
+    Math.sin(binaryAngle * starB.verticalFrequency + starB.verticalPhase) * starB.verticalAmplitude,
+    Math.sin(binaryAngle + starB.phaseOffset) * starB.orbitRadius,
   );
   const planetPosition = new THREE.Vector3(
     Math.cos(planetAngle) * planetOrbitRadius,
@@ -165,7 +170,7 @@ export function computeBinarySimulationState({
     Math.sin(planetAngle) * planetOrbitRadius,
   );
 
-  const spinAxis = new THREE.Vector3(0, Math.cos(AXIAL_TILT), Math.sin(AXIAL_TILT)).normalize();
+  const spinAxis = new THREE.Vector3(0, Math.cos(axialTiltRad), Math.sin(axialTiltRad)).normalize();
   const cosLat = Math.cos(observerLatitude);
   const toA = new THREE.Vector3().subVectors(starAPosition, planetPosition).normalize();
   const toB = new THREE.Vector3().subVectors(starBPosition, planetPosition).normalize();
@@ -222,8 +227,8 @@ export function computeBinarySimulationState({
   viewerDirLocal.normalize();
 
   // Weight by inverse-square falloff and star "intrinsic" brightness.
-  const weightA = STAR_A_LUMINOSITY / (distA * distA);
-  const weightB = STAR_B_LUMINOSITY / (distB * distB);
+  const weightA = starA.luminosity / (distA * distA);
+  const weightB = starB.luminosity / (distB * distB);
   const cameraFromPlanet = cameraPosition instanceof THREE.Vector3
     ? cameraPosition.clone().sub(planetPosition)
     : new THREE.Vector3(0, 0, 1);
@@ -295,7 +300,8 @@ export function computeBinarySimulationState({
     dayPhase,
     seasonDay,
     seasonPhase,
-    resonanceLabel: `${RESONANCE_BINARY_CYCLES}:${RESONANCE_PLANET_CYCLES}`,
+    systemKey: system.key,
+    resonanceLabel: `${resonanceCycles.binary}:${resonanceCycles.planet}`,
     resonancePhase,
     resonanceStrength,
     resonanceWindow,

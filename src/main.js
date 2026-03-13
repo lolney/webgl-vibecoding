@@ -12,6 +12,7 @@ import cityModuleAssetUrl from "./assets/city_module_asset.glb?url";
 import { clocktowerScene } from "./scenes/clocktowerScene.js";
 import { binaryExternalScene } from "./scenes/binaryExternalScene.js";
 import { binarySurfaceScene } from "./scenes/binarySurfaceScene.js";
+import { binaryTwilightSurfaceScene } from "./scenes/binaryTwilightSurfaceScene.js";
 import { eclipseScene } from "./scenes/eclipseScene.js";
 import { createSceneManager } from "./scenes/sceneManager.js";
 import { createHudPrimitive } from "./ui/hudPrimitive.js";
@@ -22,6 +23,7 @@ import { updateBinaryScene } from "./scenes/controllers/binarySceneController.js
 import { updateClocktowerScene } from "./scenes/controllers/clocktowerSceneController.js";
 import { applySceneModeInternal } from "./scenes/controllers/sceneModeController.js";
 import { computeBinarySimulationState } from "./scenes/shared/orbital.js";
+import { isBinaryExternalScene, isBinarySurfaceScene } from "./scenes/shared/sceneFamilies.js";
 import {
   binaryDefaultSimulationDays,
   binaryDefaultStartHour,
@@ -1692,7 +1694,7 @@ Promise.all([loadGLTF(towerAssetUrl), loadGLTF(cityModuleAssetUrl)])
   });
 
 let activeSceneKey = "clocktower";
-const sceneDefinitions = [clocktowerScene, binaryExternalScene, binarySurfaceScene, eclipseScene];
+const sceneDefinitions = [clocktowerScene, binaryExternalScene, binarySurfaceScene, binaryTwilightSurfaceScene, eclipseScene];
 const sceneManager = createSceneManager({ sceneDefs: sceneDefinitions });
 const sceneByKey = Object.fromEntries(sceneDefinitions.map((sceneDef) => [sceneDef.key, sceneDef]));
 const sceneLabels = Object.fromEntries(sceneDefinitions.map((sceneDef) => [sceneDef.key, sceneDef.label]));
@@ -1789,7 +1791,7 @@ function setObserverCoordinates(latitudeDeg, longitudeDeg, options = {}) {
   activePresetKey = "";
   hud.setPreset("");
   applyObserverTravelCoordinates(latitudeDeg, longitudeDeg);
-  if (activeSceneKey === "binarySurface") updateSurfaceCamera(getSurfaceCinematicBlend());
+  if (isBinarySurfaceScene(activeSceneKey)) updateSurfaceCamera(getSurfaceCinematicBlend());
   if (syncUrl) syncSceneToUrl(activeSceneKey, { pushHistory });
 }
 
@@ -1803,6 +1805,7 @@ function getSurfaceObserverState() {
     binaryDayHours,
     simulationDays: binarySimulationDays,
     planetOrbitRadius,
+    systemKey: sceneByKey[activeSceneKey]?.binarySystemKey,
     cameraPosition: surfaceObserverAnchor,
     cameraTarget: surfaceObserverAnchor.clone().add(surfaceLookDir),
     observerLatitude: THREE.MathUtils.degToRad(observerLatitudeTravelDeg || 0),
@@ -1812,13 +1815,23 @@ function getSurfaceObserverState() {
 }
 
 function getSurfaceCinematicBlend() {
-  return activeSceneKey === "binarySurface" && cinematic ? cinematicMix : 0;
+  return isBinarySurfaceScene(activeSceneKey) && cinematic ? cinematicMix : 0;
 }
 
 function updateSurfaceCamera(cinematicMix = 0) {
   const orbit = getSurfaceObserverState();
   if (cinematicMix > 0.001) {
-    surfaceViewerForwardWorld.lerp(orbit.primaryDir, cinematicMix * 0.14).normalize();
+    let trackTarget = orbit.primaryDir;
+    if (activeSceneKey === "binaryTwilightSurface") {
+      if (orbit.primaryAltitude <= 0 && orbit.secondaryAltitude > 0) {
+        trackTarget = orbit.secondaryDir;
+      } else if (orbit.primaryAltitude > 0 && orbit.secondaryAltitude > 0) {
+        trackTarget = orbit.primaryDir.clone().lerp(orbit.secondaryDir, 0.28).normalize();
+      } else if (orbit.primaryAltitude <= 0 && orbit.secondaryAltitude <= 0) {
+        trackTarget = orbit.primaryDir.clone().lerp(orbit.secondaryDir, 0.5).normalize();
+      }
+    }
+    surfaceViewerForwardWorld.lerp(trackTarget, cinematicMix * 0.14).normalize();
   }
   const localLook = localDirectionFromWorld(surfaceViewerForwardWorld, orbit);
   surfaceLookDir.copy(localLook);
@@ -1928,7 +1941,7 @@ function applyBinaryPreset(presetKey, options = {}) {
   if (typeof presetState.cinematic === "boolean") {
     setCinematic(presetState.cinematic);
   }
-  if (activeSceneKey === "binarySurface") {
+  if (isBinarySurfaceScene(activeSceneKey)) {
     surfaceObserverAnchor.set(0, 1.42, 0);
     const orbit = getSurfaceObserverState();
     aimSurfaceForwardAtPrimary(orbit, presetState.surfacePitch);
@@ -1999,7 +2012,7 @@ function applySceneMode(nextSceneKey, options = {}) {
     syncSceneToUrl,
     setCinematic,
   });
-  if (activeSceneKey === "binarySurface") {
+  if (isBinarySurfaceScene(activeSceneKey)) {
     surfaceObserverAnchor.set(0, 1.42, 0);
     surfaceViewDistance = 12.4;
     const orbit = getSurfaceObserverState();
@@ -2014,14 +2027,14 @@ function applySceneMode(nextSceneKey, options = {}) {
   }
   onResize();
   setCinematic(cinematic);
-  controls.enabled = activeSceneKey !== "binarySurface";
-  orbitSchematic.setVisible(activeSceneKey === "binarySurface");
-  viewerSchematic.setVisible(activeSceneKey === "binarySurface");
+  controls.enabled = !isBinarySurfaceScene(activeSceneKey);
+  orbitSchematic.setVisible(isBinarySurfaceScene(activeSceneKey));
+  viewerSchematic.setVisible(isBinarySurfaceScene(activeSceneKey));
   if (timeIndicator) {
     timeIndicator.style.display = activeSceneKey === "clocktower" ? "none" : "inline-block";
   }
   if (timeRateButton) {
-    timeRateButton.style.display = activeSceneKey === "binarySurface" ? "inline-block" : "none";
+    timeRateButton.style.display = isBinarySurfaceScene(activeSceneKey) ? "inline-block" : "none";
   }
   if (presetChooser) {
     presetChooser.style.display = activeSceneKey === "clocktower" ? "none" : "inline-block";
@@ -2254,11 +2267,12 @@ const sectionNames = ["Pulse Forge", "Hyper Lift", "Night Glide", "Strobe Core"]
 
 function setCinematic(on) {
   cinematic = on;
-  if (!cinematic && activeSceneKey === "binarySurface") {
+  if (!cinematic && isBinarySurfaceScene(activeSceneKey)) {
     cinematicMix = 0;
   }
-  if (activeSceneKey === "binarySurface") {
-    modeBadge.textContent = on ? "Sun Track // Planet POV" : "Free Look // Planet POV";
+  if (isBinarySurfaceScene(activeSceneKey)) {
+    const surfaceLabel = activeSceneKey === "binaryTwilightSurface" ? "Twilight Relay" : "Planet POV";
+    modeBadge.textContent = on ? `Sun Track // ${surfaceLabel}` : `Free Look // ${surfaceLabel}`;
     return;
   }
   if (activeSceneKey === "binaryExternal") {
@@ -2308,7 +2322,7 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
   activePresetKey = "";
   hud.setPreset("");
   if (cinematic) setCinematic(false);
-  if (activeSceneKey === "binarySurface") {
+  if (isBinarySurfaceScene(activeSceneKey)) {
     surfacePointerId = e.pointerId;
     surfacePointerLastX = e.clientX;
     surfacePointerLastY = e.clientY;
@@ -2317,7 +2331,7 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
   }
 });
 window.addEventListener("pointermove", (e) => {
-  if (activeSceneKey !== "binarySurface" || surfacePointerId !== e.pointerId) return;
+  if (!isBinarySurfaceScene(activeSceneKey) || surfacePointerId !== e.pointerId) return;
   const dx = e.clientX - surfacePointerLastX;
   const dy = e.clientY - surfacePointerLastY;
   surfacePointerLastX = e.clientX;
@@ -2344,7 +2358,7 @@ function releaseSurfacePointer(e) {
 window.addEventListener("pointerup", releaseSurfacePointer);
 window.addEventListener("pointercancel", releaseSurfacePointer);
 renderer.domElement.addEventListener("wheel", (e) => {
-  if (activeSceneKey === "binarySurface") {
+  if (isBinarySurfaceScene(activeSceneKey)) {
     activePresetKey = "";
     hud.setPreset("");
     surfaceViewDistance = THREE.MathUtils.clamp(
@@ -2441,7 +2455,7 @@ window.__setBinaryTime = (hours) => {
   activePresetKey = "";
   hud.setPreset("");
   setBinaryClockHours(hours, { preserveContinuity: true });
-  if (activeSceneKey === "binarySurface") updateSurfaceCamera(getSurfaceCinematicBlend());
+  if (isBinarySurfaceScene(activeSceneKey)) updateSurfaceCamera(getSurfaceCinematicBlend());
 };
 window.__getBinaryTime = () => binaryDayHours;
 window.__getBinarySimulationDays = () => binarySimulationDays;
@@ -2498,10 +2512,10 @@ window.__setDiagnosticsVisible = (visible) => {
 };
 function getCurrentOrbitView() {
   return {
-    azimuth: activeSceneKey === "binarySurface"
+    azimuth: isBinarySurfaceScene(activeSceneKey)
       ? Math.atan2(surfaceLookDir.x, surfaceLookDir.z)
       : controls.getAzimuthalAngle(),
-    polar: activeSceneKey === "binarySurface"
+    polar: isBinarySurfaceScene(activeSceneKey)
       ? ((Math.PI / 2) - Math.asin(THREE.MathUtils.clamp(surfaceLookDir.y, -1, 1)))
       : controls.getPolarAngle(),
     distance: camera.position.distanceTo(controls.target),
@@ -2511,7 +2525,7 @@ function getCurrentOrbitView() {
 window.__getOrbitView = () => getCurrentOrbitView();
 window.__setOrbitView = (view = {}) => {
   const azimuth = Number.isFinite(view.azimuth) ? view.azimuth : 0;
-  const defaultPolar = activeSceneKey === "binarySurface" ? 1.35 : Math.PI * 0.52;
+  const defaultPolar = isBinarySurfaceScene(activeSceneKey) ? 1.35 : Math.PI * 0.52;
   const polar = Number.isFinite(view.polar) ? view.polar : defaultPolar;
   const distance = Number.isFinite(view.distance) ? view.distance : 12;
   const tx = Number.isFinite(view.targetX) ? view.targetX : controls.target.x;
@@ -2524,7 +2538,7 @@ window.__setOrbitView = (view = {}) => {
     azimuth,
   );
   const offset = new THREE.Vector3().setFromSpherical(s);
-  if (activeSceneKey === "binarySurface") {
+  if (isBinarySurfaceScene(activeSceneKey)) {
     activePresetKey = "";
     hud.setPreset("");
     surfaceViewDistance = clampedDistance;
@@ -2711,11 +2725,11 @@ function tick() {
     setCinematic(cinematic);
   }
 
-  if (activeSceneKey !== "binarySurface") {
+  if (!isBinarySurfaceScene(activeSceneKey)) {
     controls.update();
   }
   const shouldCinematicBlend = cinematic;
-  cinematicMix = activeSceneKey === "binarySurface" && !shouldCinematicBlend
+  cinematicMix = isBinarySurfaceScene(activeSceneKey) && !shouldCinematicBlend
     ? 0
     : THREE.MathUtils.lerp(cinematicMix, shouldCinematicBlend ? 1 : 0, 0.02);
   const dayAdvance = dt * binaryHourRateBase * binaryTimeMultiplier;
@@ -2724,7 +2738,7 @@ function tick() {
     24,
   );
   binarySimulationDays += dayAdvance / 24;
-  if (activeSceneKey === "binarySurface") {
+  if (isBinarySurfaceScene(activeSceneKey)) {
     updateSurfaceCamera(getSurfaceCinematicBlend());
   }
 
@@ -2736,6 +2750,7 @@ function tick() {
       level,
       cinematicMix,
       activeSceneKey,
+      binarySystemKey: sceneByKey[activeSceneKey]?.binarySystemKey,
       binaryDayHours,
       binarySimulationDays,
       observerLatitudeTravelDeg,
@@ -2745,8 +2760,8 @@ function tick() {
       surfaceViewerForwardWorld,
       debugView,
     });
-    orbitSchematic.render(activeSceneKey === "binarySurface" ? sceneDebug.schematic : null);
-    viewerSchematic.render(activeSceneKey === "binarySurface" ? sceneDebug.viewerInset : null);
+    orbitSchematic.render(isBinarySurfaceScene(activeSceneKey) ? sceneDebug.schematic : null);
+    viewerSchematic.render(isBinarySurfaceScene(activeSceneKey) ? sceneDebug.viewerInset : null);
   } else {
     clocktowerControllerCtx.usingBlenderTower = usingBlenderTower;
     clocktowerControllerCtx.usingBlenderCity = usingBlenderCity;
