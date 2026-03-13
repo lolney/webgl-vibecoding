@@ -355,6 +355,10 @@ export function computeBinarySimulationState({
     secondaryDeclination,
     primaryAzimuth,
     secondaryAzimuth,
+    primaryAngularRadius: apparentStarA.angularRadius,
+    secondaryAngularRadius: apparentStarB.angularRadius,
+    primaryAngularRadiusDeg: THREE.MathUtils.radToDeg(apparentStarA.angularRadius),
+    secondaryAngularRadiusDeg: THREE.MathUtils.radToDeg(apparentStarB.angularRadius),
     orbitRadius: planetOrbitRadius,
   };
 }

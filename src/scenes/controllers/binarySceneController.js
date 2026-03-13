@@ -332,8 +332,10 @@ export function updateBinaryScene(ctx, frame) {
       surfaceFarOcean.material.uniforms.alpha.value = aerialPerspective.surface.farAlpha;
     }
 
-    surfaceSunA.group.visible = primary.visibleFactor > 0.01;
-    surfaceSunB.group.visible = secondary.visibleFactor > 0.01;
+    const primaryDiscVisible = primary.altitudeDeg > -orbit.primaryAngularRadiusDeg;
+    const secondaryDiscVisible = secondary.altitudeDeg > -orbit.secondaryAngularRadiusDeg;
+    surfaceSunA.group.visible = primaryDiscVisible;
+    surfaceSunB.group.visible = secondaryDiscVisible;
     surfaceBeamA.visible = false;
     surfaceBeamB.visible = false;
     surfaceReflectionA.visible = false;
